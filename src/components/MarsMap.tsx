@@ -159,6 +159,20 @@ export const MarsMap: React.FC<MarsMapProps> = ({
         paint: { 'line-color': ['get', 'color'], 'line-width': 2 }
       });
 
+      // Blocked hazard zone polygon (placed underneath route lines)
+      map.addSource('blocked-hazard-source', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      });
+      map.addLayer({
+        id: 'blocked-hazard-fill', type: 'fill', source: 'blocked-hazard-source',
+        paint: { 'fill-color': '#ef4444', 'fill-opacity': 0.15 }
+      });
+      map.addLayer({
+        id: 'blocked-hazard-outline', type: 'line', source: 'blocked-hazard-source',
+        paint: { 'line-color': '#ef4444', 'line-width': 1.5, 'line-dasharray': [4, 3] }
+      });
+
       map.addSource('route-normal-source', {
         type: 'geojson', data: routeFeature(normalRoute, GALE_BASE_COORDINATES)
       });
@@ -179,26 +193,12 @@ export const MarsMap: React.FC<MarsMapProps> = ({
       map.addLayer({
         id: 'route-emergency-glow', type: 'line', source: 'route-emergency-source',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#ef4444', 'line-width': 5, 'line-opacity': 0.2, 'line-blur': 3 }
+        paint: { 'line-color': '#ef4444', 'line-width': 12, 'line-opacity': 0.2, 'line-blur': 4 }
       });
       map.addLayer({
         id: 'route-emergency-core', type: 'line', source: 'route-emergency-source',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#f87171', 'line-width': 2, 'line-opacity': 0.35, 'line-dasharray': [3, 2] }
-      });
-
-      // Blocked hazard zone polygon (initially empty — populated when emergency is activated)
-      map.addSource('blocked-hazard-source', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] }
-      });
-      map.addLayer({
-        id: 'blocked-hazard-fill', type: 'fill', source: 'blocked-hazard-source',
-        paint: { 'fill-color': '#ef4444', 'fill-opacity': 0.30 }
-      });
-      map.addLayer({
-        id: 'blocked-hazard-outline', type: 'line', source: 'blocked-hazard-source',
-        paint: { 'line-color': '#f87171', 'line-width': 2, 'line-dasharray': [4, 3] }
+        paint: { 'line-color': '#ef4444', 'line-width': 4.5, 'line-opacity': 0.4, 'line-dasharray': [3, 2] }
       });
 
       const showOverlayPopup = (event: MapLayerMouseEvent) => {
@@ -378,12 +378,18 @@ export const MarsMap: React.FC<MarsMapProps> = ({
     if (!map) return;
     const update = (): boolean => {
       if (!map.getLayer('route-normal-core') || !map.getLayer('route-emergency-core')) return false;
-      map.setPaintProperty('route-normal-glow', 'line-opacity', isEmergency ? 0.15 : 0.5);
-      map.setPaintProperty('route-normal-core', 'line-opacity', isEmergency ? 0.3 : 0.95);
-      map.setPaintProperty('route-emergency-glow', 'line-opacity', isEmergency ? 0.8 : 0.2);
-      map.setPaintProperty('route-emergency-glow', 'line-width', isEmergency ? 14 : 5);
-      map.setPaintProperty('route-emergency-core', 'line-opacity', isEmergency ? 1 : 0.35);
-      map.setPaintProperty('route-emergency-core', 'line-width', isEmergency ? 5 : 2);
+
+      // Normal route: solid cyan when nominal, dim dashed cyan when in emergency
+      map.setPaintProperty('route-normal-glow', 'line-opacity', isEmergency ? 0.08 : 0.45);
+      map.setPaintProperty('route-normal-core', 'line-opacity', isEmergency ? 0.25 : 0.95);
+      map.setPaintProperty('route-normal-core', 'line-dasharray', isEmergency ? [2, 3] : [1]);
+
+      // Emergency route: faint dashed when nominal, bold solid glowing red when in emergency
+      map.setPaintProperty('route-emergency-glow', 'line-opacity', isEmergency ? 0.85 : 0.15);
+      map.setPaintProperty('route-emergency-glow', 'line-width', isEmergency ? 14 : 4);
+      map.setPaintProperty('route-emergency-core', 'line-opacity', isEmergency ? 1.0 : 0.3);
+      map.setPaintProperty('route-emergency-core', 'line-width', isEmergency ? 5.0 : 2.0);
+      map.setPaintProperty('route-emergency-core', 'line-dasharray', isEmergency ? [1] : [3, 2]);
 
       const coordinates = isEmergency ? emergencyRoute?.coordinates : normalRoute?.coordinates;
       if (coordinates && coordinates.length >= 2) {
