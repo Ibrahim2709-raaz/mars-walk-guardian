@@ -28,8 +28,12 @@ interface Mars3DSceneProps {
   normalRoute: RouteData | null;
   emergencyRoute: RouteData | null;
   blockedHazardCells: { row: number; column: number }[] | null;
-  initialMode?: 'orbital' | 'surface';
+  mode?: 'orbital' | 'surface';
+  isDropModeActive?: boolean;
+  onDropModeChange?: (active: boolean) => void;
   onModeChange?: (mode: 'orbital' | 'surface') => void;
+  selectedBookmark?: MarsBookmark | null;
+  onClearSelectedBookmark?: () => void;
 }
 
 export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
@@ -37,8 +41,12 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
   normalRoute,
   emergencyRoute,
   blockedHazardCells,
-  initialMode = 'orbital',
-  onModeChange
+  mode: propMode = 'orbital',
+  isDropModeActive = false,
+  onDropModeChange,
+  onModeChange,
+  selectedBookmark,
+  onClearSelectedBookmark
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<SceneView | null>(null);
@@ -47,9 +55,8 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
   const hazardGraphicsLayerRef = useRef<GraphicsLayer | null>(null);
 
   // Application State
-  const [mode, setMode] = useState<'orbital' | 'surface'>(initialMode);
+  const [mode, setMode] = useState<'orbital' | 'surface'>(propMode);
   const [isTerrainLoading, setIsTerrainLoading] = useState<boolean>(true);
-  const [isDropModeActive, setIsDropModeActive] = useState<boolean>(false);
 
   // First-Person Controller State
   const [eyeHeightM, setEyeHeightM] = useState<number>(1.7);
@@ -111,9 +118,9 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
     });
 
     // 3. Create Graphics Layers
-    const hazardLayer = new GraphicsLayer({ id: 'hazardLayer', elevationInfo: { mode: 'on-the-ground' } });
-    const routeLayer = new GraphicsLayer({ id: 'routeLayer', elevationInfo: { mode: 'on-the-ground' } });
-    const markersLayer = new GraphicsLayer({ id: 'markersLayer', elevationInfo: { mode: 'relative-to-ground', offset: 3 } });
+    const hazardLayer = new GraphicsLayer({ id: 'hazardLayer', elevationInfo: { mode: 'relative-to-ground', offset: 2 } });
+    const routeLayer = new GraphicsLayer({ id: 'routeLayer', elevationInfo: { mode: 'relative-to-ground', offset: 2.5 } });
+    const markersLayer = new GraphicsLayer({ id: 'markersLayer', elevationInfo: { mode: 'relative-to-ground', offset: 4 } });
 
     hazardGraphicsLayerRef.current = hazardLayer;
     routeGraphicsLayerRef.current = routeLayer;
@@ -256,9 +263,9 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
           symbolLayers: [
             {
               type: 'line',
-              size: isEmergency ? 2 : 4,
+              size: isEmergency ? 3 : 8,
               material: {
-                color: isEmergency ? [14, 165, 233, 0.35] : [56, 189, 248, 0.95]
+                color: isEmergency ? [14, 165, 233, 0.4] : [0, 240, 255, 1.0]
               }
             }
           ]
@@ -266,6 +273,38 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
       });
 
       routeLayer.add(normalGraphic);
+
+      // Start Waypoint (Gale Rover Base) Marker
+      const startPt = normalRoute.coordinates[0];
+      routeLayer.add(new Graphic({
+        geometry: new Point({ x: startPt[0], y: startPt[1], spatialReference: marsSpatialReference }),
+        symbol: {
+          type: 'point-3d',
+          symbolLayers: [{
+            type: 'icon',
+            size: 16,
+            material: { color: [249, 115, 22] },
+            outline: { color: [255, 255, 255, 0.95], size: 2 },
+            resource: { primitive: 'diamond' }
+          }]
+        } as any
+      }));
+
+      // End Waypoint (Science Target Candidate) Marker
+      const endPt = normalRoute.coordinates[normalRoute.coordinates.length - 1];
+      routeLayer.add(new Graphic({
+        geometry: new Point({ x: endPt[0], y: endPt[1], spatialReference: marsSpatialReference }),
+        symbol: {
+          type: 'point-3d',
+          symbolLayers: [{
+            type: 'icon',
+            size: 16,
+            material: { color: [16, 185, 129] },
+            outline: { color: [255, 255, 255, 0.95], size: 2 },
+            resource: { primitive: 'circle' }
+          }]
+        } as any
+      }));
     }
 
     // Emergency Contingency Return Route
@@ -282,9 +321,9 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
           symbolLayers: [
             {
               type: 'line',
-              size: isEmergency ? 5.5 : 2,
+              size: isEmergency ? 10 : 3,
               material: {
-                color: isEmergency ? [239, 68, 68, 1.0] : [239, 68, 68, 0.3]
+                color: isEmergency ? [239, 68, 68, 1.0] : [239, 68, 68, 0.35]
               }
             }
           ]
@@ -293,6 +332,48 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
 
       routeLayer.add(emergencyGraphic);
     }
+
+    // High-Altitude Orbital Mission Beacon (prominently visible from space)
+    const missionBeaconGraphic = new Graphic({
+      geometry: new Point({
+        x: 137.37984,
+        y: -4.80484,
+        spatialReference: marsSpatialReference
+      }),
+      symbol: {
+        type: 'point-3d',
+        symbolLayers: [
+          {
+            type: 'icon',
+            size: 20,
+            material: { color: isEmergency ? [239, 68, 68] : [0, 240, 255] },
+            outline: { color: [255, 255, 255, 0.95], size: 2 },
+            resource: { primitive: 'square' }
+          }
+        ],
+        verticalOffset: {
+          screenLength: 32,
+          maxWorldLength: 500000,
+          minWorldLength: 15
+        },
+        callout: {
+          type: 'line',
+          size: 1.5,
+          color: isEmergency ? [239, 68, 68, 0.85] : [0, 240, 255, 0.85]
+        }
+      } as any,
+      popupTemplate: {
+        title: 'Gale Crater Mission Traverse (86m)',
+        content: `
+          <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#e2e8f0;">
+            <p><strong>Status:</strong> ${isEmergency ? 'Emergency Contingency Active' : 'Planned Outbound Science'}</p>
+            <p><strong>Baseline Distance:</strong> ~86 meters (1.012 m/cell)</p>
+            <p><strong>Location:</strong> 137.38°E, 4.805°S (Gale Crater floor)</p>
+          </div>
+        `
+      }
+    });
+    routeLayer.add(missionBeaconGraphic);
   }, [normalRoute, emergencyRoute, isEmergency]);
 
   // Update Blocked Hazard Area Polygon
@@ -353,7 +434,12 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
       try {
         // Query exact ground DEM elevation at this Martian coordinate
         const elevationResult = await view.map.ground.queryElevation(point);
-        const surfaceElevation = (elevationResult?.geometry as Point)?.z ?? 0;
+        let surfaceElevation = (elevationResult?.geometry as Point)?.z;
+
+        // If in Gale Crater area and query is undefined, default to Gale floor elevation (~ -3631m)
+        if (surfaceElevation === undefined || isNaN(surfaceElevation)) {
+          surfaceElevation = Math.abs(point.x - 137.38) < 0.3 && Math.abs(point.y - -4.805) < 0.3 ? -3631 : 0;
+        }
 
         const currentHeading = view.camera?.heading ?? 0;
 
@@ -373,7 +459,7 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
 
         setMode('surface');
         if (onModeChange) onModeChange('surface');
-        setIsDropModeActive(false);
+        if (onDropModeChange) onDropModeChange(false);
 
         const nearest = findNearestLandmark(point);
         setTelemetry({
@@ -392,7 +478,7 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
         setIsTerrainLoading(false);
       }
     },
-    [onModeChange]
+    [onModeChange, onDropModeChange]
   );
 
   // Return to Orbital 3D Globe View
@@ -404,6 +490,7 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
 
     setMode('orbital');
     if (onModeChange) onModeChange('orbital');
+    if (onDropModeChange) onDropModeChange(false);
 
     const currentPos = view.camera.position;
     const orbitalCamera = new Camera({
@@ -418,7 +505,46 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
     });
 
     await view.goTo(orbitalCamera, { duration: 2000, easing: 'in-out-cubic' });
-  }, [onModeChange]);
+  }, [onModeChange, onDropModeChange]);
+
+  // Focus directly on the 86m Gale Crater Route
+  const focusGaleMissionRoute = useCallback(async () => {
+    const view = viewRef.current;
+    if (!view) return;
+
+    const missionCamera = new Camera({
+      position: new Point({
+        x: 137.37984,
+        y: -4.8070,
+        z: -3440, // ~190m above -3631m Gale Crater floor
+        spatialReference: marsSpatialReference
+      }),
+      heading: 355,
+      tilt: 58
+    });
+
+    await view.goTo(missionCamera, { duration: 2200, easing: 'in-out-cubic' });
+  }, []);
+
+  // Respond to prop mode changes (e.g. Header button click)
+  useEffect(() => {
+    if (propMode && propMode !== mode) {
+      setMode(propMode);
+      if (propMode === 'surface') {
+        const view = viewRef.current;
+        if (view) {
+          const currentZ = view.camera?.position?.z ?? 0;
+          if (currentZ > -3000) {
+            void dropToSurfaceAt(new Point({
+              x: 137.38017231,
+              y: -4.80425574,
+              spatialReference: marsSpatialReference
+            }));
+          }
+        }
+      }
+    }
+  }, [propMode, mode, dropToSurfaceAt]);
 
   // Handle "Drop Me Here" map click
   useEffect(() => {
@@ -435,6 +561,33 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
       clickHandle.remove();
     };
   }, [isDropModeActive, dropToSurfaceAt]);
+
+  // Fly to Bookmark Handler
+  const handleFlyToBookmark = useCallback((bookmark: MarsBookmark) => {
+    const view = viewRef.current;
+    if (!view) return;
+
+    const cam = new Camera({
+      position: new Point({
+        x: bookmark.camera.position.x,
+        y: bookmark.camera.position.y,
+        z: bookmark.camera.position.z,
+        spatialReference: marsSpatialReference
+      }),
+      heading: bookmark.camera.heading,
+      tilt: bookmark.camera.tilt
+    });
+
+    void view.goTo(cam, { duration: 2400, easing: 'in-out-cubic' });
+  }, []);
+
+  // Respond to bookmark selection from parent
+  useEffect(() => {
+    if (selectedBookmark) {
+      handleFlyToBookmark(selectedBookmark);
+      onClearSelectedBookmark?.();
+    }
+  }, [selectedBookmark, handleFlyToBookmark, onClearSelectedBookmark]);
 
   // First-Person Frame Loop (WASD Movement & Eye-Level Tracking)
   useEffect(() => {
@@ -598,29 +751,29 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
     };
   }, [exitToOrbit]);
 
-  // Fly to Bookmark Handler
-  const handleFlyToBookmark = useCallback((bookmark: MarsBookmark) => {
-    const view = viewRef.current;
-    if (!view) return;
-
-    const cam = new Camera({
-      position: new Point({
-        x: bookmark.camera.position.x,
-        y: bookmark.camera.position.y,
-        z: bookmark.camera.position.z,
-        spatialReference: marsSpatialReference
-      }),
-      heading: bookmark.camera.heading,
-      tilt: bookmark.camera.tilt
-    });
-
-    void view.goTo(cam, { duration: 2400, easing: 'in-out-cubic' });
-  }, []);
-
   return (
     <div className="relative w-full h-full min-h-[500px] overflow-hidden rounded-xl border border-orange-500/30 shadow-2xl bg-slate-950">
       {/* ArcGIS 3D Canvas Container */}
-      <div ref={containerRef} className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing" />
+      <div
+        ref={containerRef}
+        className={`absolute inset-0 w-full h-full ${
+          isDropModeActive ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'
+        }`}
+      />
+
+      {/* Quick Action: Focus Gale Mission Route in 3D */}
+      {mode === 'orbital' && (
+        <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
+          <button
+            onClick={() => void focusGaleMissionRoute()}
+            className="px-3 py-1.5 bg-slate-900/90 hover:bg-slate-800 text-cyan-300 border border-cyan-500/50 hover:border-cyan-400 rounded-lg shadow-xl font-mono text-xs font-bold flex items-center gap-2 cursor-pointer transition-all backdrop-blur"
+            title="Fly directly to Gale Crater and frame the 86m route"
+          >
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+            <span>FOCUS GALE MISSION (86m ROUTE)</span>
+          </button>
+        </div>
+      )}
 
       {/* Surface First-Person Mode HUD */}
       {mode === 'surface' && (
@@ -652,12 +805,12 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
 
       {/* Drop Me Here Helper Callout Banner */}
       {isDropModeActive && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-emerald-950/90 border border-emerald-500 text-emerald-200 font-mono text-xs px-4 py-2 rounded-xl shadow-2xl backdrop-blur flex items-center gap-2 animate-bounce">
-          <span className="w-2 h-2 rounded-full bg-emerald-400" />
-          <span>Click any point on the Martian surface to land at 1.7 m eye-level</span>
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 bg-orange-950/95 border-2 border-orange-500 text-orange-200 font-mono text-xs px-4 py-2.5 rounded-xl shadow-2xl backdrop-blur flex items-center gap-3 animate-pulse">
+          <span className="w-2.5 h-2.5 rounded-full bg-orange-400 animate-ping" />
+          <span className="font-bold tracking-wide">TARGETING ACTIVE — CLICK ANY POINT ON MARS TO LAND AT 1.7M EYE-LEVEL</span>
           <button
-            onClick={() => setIsDropModeActive(false)}
-            className="ml-2 text-slate-400 hover:text-white text-xs underline cursor-pointer"
+            onClick={() => onDropModeChange?.(false)}
+            className="ml-2 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded text-[11px] font-mono border border-slate-700 cursor-pointer"
           >
             Cancel
           </button>

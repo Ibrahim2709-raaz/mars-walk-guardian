@@ -31,15 +31,28 @@ export interface MarsBookmark {
 
 export const MARS_BOOKMARKS: MarsBookmark[] = [
   {
+    id: 'gale-mission-route',
+    name: 'Gale Mission Traverse (86m Route)',
+    category: 'base',
+    description: 'Close-up 3D view of the 86m rover traverse and simulated obstacle corridor in Gale Crater.',
+    coordinates: [137.37984, -4.80484],
+    camera: {
+      position: { x: 137.37984, y: -4.8070, z: -3440 }, // ~190 m above -3631m terrain floor
+      heading: 355,
+      tilt: 58
+    },
+    groundElevationApproxM: -3628
+  },
+  {
     id: 'gale-base',
     name: 'Gale Rover Base Alpha',
     category: 'base',
     description: 'Simulated operations hub in Gale Crater near Mount Sharp (Aeolis Mons).',
     coordinates: [137.38017, -4.80426],
     camera: {
-      position: { x: 137.38017, y: -4.808, z: 2400 },
-      heading: 0,
-      tilt: 72
+      position: { x: 137.38017, y: -4.8068, z: -3450 }, // ~180 m above -3631m floor
+      heading: 350,
+      tilt: 62
     },
     groundElevationApproxM: -3631
   },
@@ -50,9 +63,9 @@ export const MARS_BOOKMARKS: MarsBookmark[] = [
     description: 'Curiosity Sol 4621 waypoint-linked exploration candidate with mineralized ridges.',
     coordinates: [137.37951, -4.80542],
     camera: {
-      position: { x: 137.37951, y: -4.809, z: 1800 },
-      heading: 0,
-      tilt: 75
+      position: { x: 137.37951, y: -4.8078, z: -3470 }, // ~160 m above -3631m floor
+      heading: 350,
+      tilt: 60
     },
     groundElevationApproxM: -3622
   },

@@ -123,6 +123,7 @@ function routeResultToCalculation(result: RouteResult): RouteCalculationResult {
 export const App: React.FC = () => {
   const [isEmergency, setIsEmergency] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('3d-orbital');
+  const [isDropModeActive, setIsDropModeActive] = useState<boolean>(false);
   const [isBookmarksOpen, setIsBookmarksOpen] = useState<boolean>(false);
   const [selectedBookmark, setSelectedBookmark] = useState<MarsBookmark | null>(null);
   const [layers, setLayers] = useState<LayerVisibility>({
@@ -295,8 +296,15 @@ export const App: React.FC = () => {
                 normalRoute={normalRoute}
                 emergencyRoute={emergencyRoute}
                 blockedHazardCells={blockedHazardCells}
-                initialMode={viewMode === '3d-surface' ? 'surface' : 'orbital'}
-                onModeChange={(newMode) => setViewMode(newMode === 'surface' ? '3d-surface' : '3d-orbital')}
+                mode={viewMode === '3d-surface' ? 'surface' : 'orbital'}
+                isDropModeActive={isDropModeActive}
+                onDropModeChange={setIsDropModeActive}
+                onModeChange={(newMode) => {
+                  setViewMode(newMode === 'surface' ? '3d-surface' : '3d-orbital');
+                  if (newMode === 'surface') setIsDropModeActive(false);
+                }}
+                selectedBookmark={selectedBookmark}
+                onClearSelectedBookmark={() => setSelectedBookmark(null)}
               />
             )}
 
@@ -311,10 +319,11 @@ export const App: React.FC = () => {
                     setFocusedCoordinates(bm.coordinates);
                   }}
                   onDropHereMode={() => {
-                    setViewMode('3d-surface');
+                    setIsDropModeActive(true);
                     setIsBookmarksOpen(false);
+                    if (viewMode === '2d-grid') setViewMode('3d-orbital');
                   }}
-                  isDropModeActive={viewMode === '3d-surface'}
+                  isDropModeActive={isDropModeActive}
                   onClose={() => setIsBookmarksOpen(false)}
                 />
               </div>
