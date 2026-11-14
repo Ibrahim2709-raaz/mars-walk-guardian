@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { EmergencyControl } from './components/EmergencyControl';
-import { Header } from './components/Header';
+import { Header, ViewMode } from './components/Header';
 import { LayerControls } from './components/LayerControls';
 import { MarsMap } from './components/MarsMap';
+import { Mars3DScene } from './components/Mars3DScene';
+import { OrbitalBookmarks } from './components/OrbitalBookmarks';
 import { RouteExplanation } from './components/RouteExplanation';
 import { TelemetryHUD } from './components/TelemetryHUD';
 import {
@@ -10,6 +12,7 @@ import {
   CURRENT_ROVER_COORDINATES,
   GALE_BASE_COORDINATES
 } from './data/marsGeoData';
+import { MarsBookmark } from './data/mars3DData';
 import { EMERGENCY_ROVER_TELEMETRY, NOMINAL_ROVER_TELEMETRY } from './data/mockTelemetry';
 import { BASE_POSITION, SCIENCE_TARGET_POSITION, TERRAIN_CELL_SIZE_M } from './data/terrainSites';
 import { calculateTerrainRoute, RouteResult } from './services/routingApi';
@@ -119,6 +122,9 @@ function routeResultToCalculation(result: RouteResult): RouteCalculationResult {
 
 export const App: React.FC = () => {
   const [isEmergency, setIsEmergency] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('3d-orbital');
+  const [isBookmarksOpen, setIsBookmarksOpen] = useState<boolean>(false);
+  const [selectedBookmark, setSelectedBookmark] = useState<MarsBookmark | null>(null);
   const [layers, setLayers] = useState<LayerVisibility>({
     optical: true,
     slope: true,
@@ -251,36 +257,83 @@ export const App: React.FC = () => {
       <Header
         telemetry={telemetry}
         isEmergency={isEmergency}
-        onCenterBase={() => setFocusedCoordinates(GALE_BASE_COORDINATES)}
-        onCenterTarget={() => setFocusedCoordinates(BOXWORK_TARGET_COORDINATES)}
-        onCenterRover={() => setFocusedCoordinates(CURRENT_ROVER_COORDINATES)}
+        viewMode={viewMode}
+        onChangeViewMode={setViewMode}
+        onToggleBookmarks={() => setIsBookmarksOpen((prev) => !prev)}
+        isBookmarksOpen={isBookmarksOpen}
+        onCenterBase={() => {
+          setFocusedCoordinates(GALE_BASE_COORDINATES);
+        }}
+        onCenterTarget={() => {
+          setFocusedCoordinates(BOXWORK_TARGET_COORDINATES);
+        }}
+        onCenterRover={() => {
+          setFocusedCoordinates(CURRENT_ROVER_COORDINATES);
+        }}
       />
 
       <main
-        className="flex-1 p-2 md:p-4 grid grid-cols-1 lg:grid-cols-12 gap-3 overflow-y-auto lg:overflow-hidden"
+        className="flex-1 p-2 md:p-4 grid grid-cols-1 lg:grid-cols-12 gap-3 overflow-y-auto lg:overflow-hidden relative"
         style={{ minHeight: 0 }}
       >
-        <section className="lg:col-span-8 flex flex-col gap-3" style={{ minHeight: '540px', height: '100%' }}>
+        {/* Left / Center Map & 3D Scene View (8 Columns on desktop) */}
+        <section className="lg:col-span-8 flex flex-col gap-3 relative" style={{ minHeight: '540px', height: '100%' }}>
           <div className="relative rounded-xl overflow-hidden" style={{ flex: '1 1 0', minHeight: '480px' }}>
-            <MarsMap
-              layers={layers}
-              isEmergency={isEmergency}
-              normalRoute={normalRoute}
-              emergencyRoute={emergencyRoute}
-              blockedHazardCells={blockedHazardCells}
-              focusedCoordinates={focusedCoordinates}
-              onClearFocus={() => setFocusedCoordinates(null)}
-            />
+            {viewMode === '2d-grid' ? (
+              <MarsMap
+                layers={layers}
+                isEmergency={isEmergency}
+                normalRoute={normalRoute}
+                emergencyRoute={emergencyRoute}
+                blockedHazardCells={blockedHazardCells}
+                focusedCoordinates={focusedCoordinates}
+                onClearFocus={() => setFocusedCoordinates(null)}
+              />
+            ) : (
+              <Mars3DScene
+                isEmergency={isEmergency}
+                normalRoute={normalRoute}
+                emergencyRoute={emergencyRoute}
+                blockedHazardCells={blockedHazardCells}
+                initialMode={viewMode === '3d-surface' ? 'surface' : 'orbital'}
+                onModeChange={(newMode) => setViewMode(newMode === 'surface' ? '3d-surface' : '3d-orbital')}
+              />
+            )}
+
+            {/* Bookmarks Drawer Overlay */}
+            {isBookmarksOpen && viewMode !== '2d-grid' && (
+              <div className="absolute top-3 left-3 z-30 animate-in fade-in slide-in-from-left-4 duration-200">
+                <OrbitalBookmarks
+                  onFlyTo={(bm) => {
+                    setSelectedBookmark(bm);
+                    setIsBookmarksOpen(false);
+                    // If bookmark is clicked, update view coordinates
+                    setFocusedCoordinates(bm.coordinates);
+                  }}
+                  onDropHereMode={() => {
+                    setViewMode('3d-surface');
+                    setIsBookmarksOpen(false);
+                  }}
+                  isDropModeActive={viewMode === '3d-surface'}
+                  onClose={() => setIsBookmarksOpen(false)}
+                />
+              </div>
+            )}
           </div>
-          <LayerControls
-            layers={layers}
-            onToggleLayer={(layerKey) => setLayers((previous) => ({
-              ...previous,
-              [layerKey]: !previous[layerKey]
-            }))}
-          />
+
+          {/* Layer Controls (Available in 2D grid mode) */}
+          {viewMode === '2d-grid' && (
+            <LayerControls
+              layers={layers}
+              onToggleLayer={(layerKey) => setLayers((previous) => ({
+                ...previous,
+                [layerKey]: !previous[layerKey]
+              }))}
+            />
+          )}
         </section>
 
+        {/* Right Tactical Mission Sidebar (4 Columns on desktop) */}
         <aside className="lg:col-span-4 flex flex-col gap-3 overflow-y-auto pr-0.5">
           <EmergencyControl
             isEmergency={isEmergency}
