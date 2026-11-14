@@ -94,11 +94,11 @@ export const App: React.FC = () => {
       />
 
       {/* Main Tactical Dashboard Body */}
-      <main className="flex-1 p-2 md:p-4 grid grid-cols-1 lg:grid-cols-12 gap-3 overflow-y-auto lg:overflow-hidden">
+      <main className="flex-1 p-2 md:p-4 grid grid-cols-1 lg:grid-cols-12 gap-3 overflow-y-auto lg:overflow-hidden" style={{ minHeight: 0 }}>
         {/* Left / Center Map Section (8 Columns on desktop) */}
-        <section className="lg:col-span-8 flex flex-col gap-3 min-h-[460px] lg:h-full">
+        <section className="lg:col-span-8 flex flex-col gap-3" style={{ minHeight: '540px', height: '100%' }}>
           {/* Interactive MapLibre Mars Map */}
-          <div className="flex-1 relative min-h-[360px] rounded-xl overflow-hidden">
+          <div className="relative rounded-xl overflow-hidden" style={{ flex: '1 1 0', minHeight: '480px' }}>
             <MarsMap
               layers={layers}
               isEmergency={isEmergency}

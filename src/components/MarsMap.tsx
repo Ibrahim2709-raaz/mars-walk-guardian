@@ -86,6 +86,7 @@ export const MarsMap: React.FC<MarsMapProps> = ({
     map.addControl(new ScaleControl({ unit: 'metric', maxWidth: 120 }), 'bottom-left');
 
     map.on('load', () => {
+      map.resize();
       // 1. Add Slope Layer
       map.addSource('slopes-source', {
         type: 'geojson',
@@ -448,7 +449,22 @@ export const MarsMap: React.FC<MarsMapProps> = ({
 
     markersRef.current = [galeBaseMarker, boxworkMarker, astronautMarker];
 
+    const handleResize = () => {
+      if (mapRef.current) {
+        mapRef.current.resize();
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    // Fire resize at 100ms, 300ms, 600ms to catch any layout paint delay
+    const t1 = setTimeout(handleResize, 100);
+    const t2 = setTimeout(handleResize, 300);
+    const timeoutId = setTimeout(handleResize, 600);
+
     return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(timeoutId);
       markersRef.current.forEach(m => m.remove());
       map.remove();
     };
@@ -526,9 +542,12 @@ export const MarsMap: React.FC<MarsMapProps> = ({
   }, [focusedCoordinates, onClearFocus]);
 
   return (
-    <div className="relative w-full h-full min-h-[420px] rounded-xl overflow-hidden border border-orange-500/30 shadow-2xl bg-slate-950">
-      {/* MapLibre DOM Container */}
-      <div ref={mapContainerRef} className="w-full h-full" />
+    <div
+      className="rounded-xl overflow-hidden border border-orange-500/30 shadow-2xl bg-slate-950"
+      style={{ position: 'absolute', inset: 0, minHeight: '480px' }}
+    >
+      {/* MapLibre DOM Container — must fill parent absolutely */}
+      <div ref={mapContainerRef} style={{ position: 'absolute', inset: 0 }} />
 
       {/* Floating Tactical Overlay Compass & Coordinate Badge */}
       <div className="absolute top-3 left-3 z-10 tactical-panel rounded-lg px-2.5 py-1.5 flex items-center gap-2 text-[10px] font-mono text-slate-300 pointer-events-none">
