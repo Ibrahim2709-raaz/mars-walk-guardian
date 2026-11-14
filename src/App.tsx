@@ -11,16 +11,14 @@ import {
 } from './data/marsGeoData';
 import {
   BASE_POSITION,
-  buildMockRoutingGrid,
-  MOCK_CELL_SIZE_M,
-  SCIENCE_TARGET_POSITION
-} from './data/mockRoutingGrid';
+  SCIENCE_TARGET_POSITION,
+  TERRAIN_CELL_SIZE_M
+} from './data/terrainSites';
 import { NOMINAL_TELEMETRY, EMERGENCY_TELEMETRY } from './data/mockTelemetry';
 import { LayerVisibility, LatLng, RouteData, SuitTelemetry, Waypoint } from './types';
 import {
-  calculateRoute,
+  calculateTerrainRoute,
   RouteResult,
-  RoutingGridCell
 } from './services/routingApi';
 
 const EMPTY_ROUTE: RouteData = {
@@ -47,7 +45,7 @@ function routeResultToRouteData(result: RouteResult, type: 'normal' | 'emergency
     const previous = result.path[index - 1];
     const current = result.path[index];
     const diagonal = previous.row !== current.row && previous.column !== current.column;
-    const distanceM = diagonal ? MOCK_CELL_SIZE_M * Math.SQRT2 : MOCK_CELL_SIZE_M;
+    const distanceM = diagonal ? TERRAIN_CELL_SIZE_M * Math.SQRT2 : TERRAIN_CELL_SIZE_M;
     const elevationChange = current.elevation_m - previous.elevation_m;
     elevationGainMeters += Math.max(0, elevationChange);
     maxSlopeDeg = Math.max(
@@ -115,16 +113,14 @@ export const App: React.FC = () => {
       setIsRouting(true);
       setRoutingError(null);
       try {
-        const result = await calculateRoute({
-          grid: buildMockRoutingGrid(),
+        const result = await calculateTerrainRoute({
           start: BASE_POSITION,
           target: SCIENCE_TARGET_POSITION,
           rover_state: {
             battery_wh: 100,
             battery_reserve_wh: 10,
             energy_per_meter_wh: 0.25
-          },
-          options: { cell_size_m: MOCK_CELL_SIZE_M }
+          }
         });
         if (!result.feasible) throw new Error(result.reason ?? 'No feasible outbound route.');
         setNormalRouteResult(result);
@@ -155,14 +151,9 @@ export const App: React.FC = () => {
     setIsRouting(true);
     setRoutingError(null);
     try {
-      const emergencyGrid: RoutingGridCell[][] = buildMockRoutingGrid().map((row) =>
-        row.map((cell) => ({ ...cell }))
-      );
       const rerouteCell = normalRouteResult.path[Math.floor(normalRouteResult.path.length / 2)];
-      if (rerouteCell) emergencyGrid[rerouteCell.row][rerouteCell.column].blocked = true;
 
-      const result = await calculateRoute({
-        grid: emergencyGrid,
+      const result = await calculateTerrainRoute({
         start: SCIENCE_TARGET_POSITION,
         target: BASE_POSITION,
         rover_state: {
@@ -170,7 +161,7 @@ export const App: React.FC = () => {
           battery_reserve_wh: 10,
           energy_per_meter_wh: 0.25
         },
-        options: { cell_size_m: MOCK_CELL_SIZE_M }
+        blocked_cells: rerouteCell ? [{ row: rerouteCell.row, column: rerouteCell.column }] : []
       });
       if (!result.feasible) throw new Error(result.reason ?? 'No feasible emergency return route.');
       setEmergencyRoute(routeResultToRouteData(result, 'emergency'));

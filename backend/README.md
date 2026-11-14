@@ -1,7 +1,8 @@
 # Python routing service
 
 The React application remains the user interface. This service owns terrain
-validation, weighted A* routing, energy calculations, and emergency rerouting.
+loading, validation, weighted A* routing, energy calculations, and emergency
+rerouting. The supplied 201×201 HiRISE DTM crop is loaded and cached server-side.
 
 ## Run locally
 
@@ -16,6 +17,14 @@ python -m uvicorn backend.app.main:app --reload --port 8000
 
 The API is then available at `http://localhost:8000`. Check it with
 `http://localhost:8000/health`.
+
+Terrain endpoints:
+
+- `GET /terrain/info` returns grid dimensions, base and target cells, provenance,
+  and explicit derived/simulated-field caveats.
+- `POST /terrain/route` calculates a route using the cached terrain crop. React
+  sends only start, target, rover state, optional threshold overrides, and any
+  simulated blocked cells.
 
 Run the routing tests without additional test dependencies:
 
