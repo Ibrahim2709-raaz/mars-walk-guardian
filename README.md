@@ -44,6 +44,15 @@ npm run dev
 
 Open the Vite URL shown in the terminal, normally `http://localhost:5173`. The API health endpoint is `http://127.0.0.1:8000/health`.
 
+## GitHub Pages
+
+The GitHub Pages workflow publishes the React interface from
+`feature/weighted-astar-routing` at `/mars-walk-guardian/`. GitHub Pages is
+static hosting and does not run the Python FastAPI backend. Set the repository
+Actions variable `VITE_ROUTING_API_URL` to a public HTTPS backend URL for live
+routing outside the local demo environment; otherwise the published interface
+will continue looking for the routing service at `http://localhost:8000`.
+
 ## Verify
 
 ```powershell
