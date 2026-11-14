@@ -1,14 +1,25 @@
 import React, { useEffect, useRef } from 'react';
-import maplibregl, { Map as MapLibreMap, Marker, Popup, NavigationControl, ScaleControl } from 'maplibre-gl';
 import {
-  GALE_BASE_COORDINATES,
+  GeoJSONSource,
+  LngLatBounds,
+  Map as MapLibreMap,
+  MapLayerMouseEvent,
+  Marker,
+  NavigationControl,
+  Popup,
+  ScaleControl,
+  StyleSpecification
+} from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import {
   BOXWORK_TARGET_COORDINATES,
   CURRENT_ROVER_COORDINATES,
-  SLOPES_GEOJSON,
+  GALE_BASE_COORDINATES,
   HAZARDS_GEOJSON,
-  MINERALS_GEOJSON
+  MINERALS_GEOJSON,
+  SLOPES_GEOJSON
 } from '../data/marsGeoData';
-import { LayerVisibility, LatLng, RouteData } from '../types';
+import { LatLng, LayerVisibility, RouteData } from '../types';
 
 interface MarsMapProps {
   layers: LayerVisibility;
@@ -18,6 +29,36 @@ interface MarsMapProps {
   focusedCoordinates: LatLng | null;
   onClearFocus: () => void;
 }
+
+const routeFeature = (route: RouteData | null, fallback: LatLng) => ({
+  type: 'Feature' as const,
+  properties: {
+    name: route?.name ?? 'Waiting for Python route',
+    provenance: 'SYSTEM-DERIVED'
+  },
+  geometry: {
+    type: 'LineString' as const,
+    coordinates: route?.coordinates.length ? route.coordinates : [fallback, fallback]
+  }
+});
+
+const markerElement = (icon: string, label: string, color: string) => {
+  const element = document.createElement('div');
+  element.className = 'mars-marker';
+  element.innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;gap:5px">
+      <div style="width:34px;height:34px;border-radius:50%;background:#0f172a;border:2px solid ${color};display:flex;align-items:center;justify-content:center;box-shadow:0 0 18px ${color}99;font-size:17px">${icon}</div>
+      <div style="padding:2px 7px;border:1px solid ${color};border-radius:4px;background:rgba(15,23,42,.95);color:${color};font:700 9px 'JetBrains Mono',monospace;white-space:nowrap">${label}</div>
+    </div>`;
+  return element;
+};
+
+const popupHtml = (badge: string, title: string, details: string, color: string) => `
+  <div style="background:#0c111d;color:#e2e8f0;padding:12px;border-radius:8px;border:1px solid ${color};font:11px 'JetBrains Mono',monospace;max-width:285px">
+    <div style="display:inline-block;color:${color};border:1px solid ${color};border-radius:3px;padding:2px 6px;font-size:9px;font-weight:700;margin-bottom:7px">${badge}</div>
+    <div style="color:${color};font-weight:700;font-size:13px;margin-bottom:6px">${title}</div>
+    <div style="color:#94a3b8;line-height:1.55">${details}</div>
+  </div>`;
 
 export const MarsMap: React.FC<MarsMapProps> = ({
   layers,
@@ -31,575 +72,265 @@ export const MarsMap: React.FC<MarsMapProps> = ({
   const mapRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
 
-  // Initialize MapLibre Map
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
-    // Define Martian Style using OpenPlanetary Mars Basemap tiles
-    const marsStyle: maplibregl.StyleSpecification = {
+    const marsStyle: StyleSpecification = {
       version: 8,
       sources: {
         'mars-basemap': {
           type: 'raster',
-          tiles: [
-            'https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-mars-basemap-v0-2/all/{z}/{x}/{y}.png'
-          ],
+          tiles: ['https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-mars-basemap-v0-2/all/{z}/{x}/{y}.png'],
           tileSize: 256,
-          attribution: '© OpenPlanetary / USGS Astrogeology / NASA'
+          attribution: 'OpenPlanetary / USGS Astrogeology / NASA'
         }
       },
       layers: [
-        {
-          id: 'mars-background',
-          type: 'background',
-          paint: {
-            'background-color': '#110b0a'
-          }
-        },
+        { id: 'mars-background', type: 'background', paint: { 'background-color': '#110b0a' } },
         {
           id: 'mars-raster-layer',
           type: 'raster',
           source: 'mars-basemap',
-          paint: {
-            'raster-opacity': 0.88,
-            'raster-contrast': 0.15,
-            'raster-brightness-min': 0.05
-          }
+          paint: { 'raster-opacity': 0.9, 'raster-contrast': 0.15, 'raster-brightness-min': 0.05 }
         }
       ]
     };
 
-    const map = new maplibregl.Map({
+    const center: LatLng = [
+      (GALE_BASE_COORDINATES[0] + BOXWORK_TARGET_COORDINATES[0]) / 2,
+      (GALE_BASE_COORDINATES[1] + BOXWORK_TARGET_COORDINATES[1]) / 2
+    ];
+    const map = new MapLibreMap({
       container: mapContainerRef.current,
       style: marsStyle,
-      center: [
-        (GALE_BASE_COORDINATES[0] + BOXWORK_TARGET_COORDINATES[0]) / 2,
-        (GALE_BASE_COORDINATES[1] + BOXWORK_TARGET_COORDINATES[1]) / 2
-      ],
-      zoom: 15.8,
-      minZoom: 9,
-      maxZoom: 16,
-      pitch: 25,
-      bearing: -10,
+      center,
+      zoom: 17.2,
+      minZoom: 12,
+      maxZoom: 20,
+      pitch: 35,
+      bearing: -15,
       attributionControl: { compact: true }
     });
-
     mapRef.current = map;
-
-    // Add UI Controls
     map.addControl(new NavigationControl({ showCompass: true, visualizePitch: true }), 'top-right');
     map.addControl(new ScaleControl({ unit: 'metric', maxWidth: 120 }), 'bottom-left');
 
     map.on('load', () => {
-      // 1. Add Slope Layer
-      map.addSource('slopes-source', {
-        type: 'geojson',
-        data: SLOPES_GEOJSON
-      });
-
+      map.resize();
+      map.addSource('slopes-source', { type: 'geojson', data: SLOPES_GEOJSON });
       map.addLayer({
-        id: 'slopes-fill',
-        type: 'fill',
-        source: 'slopes-source',
-        layout: {
-          visibility: layers.slope ? 'visible' : 'none'
-        },
+        id: 'slopes-fill', type: 'fill', source: 'slopes-source',
+        layout: { visibility: layers.slope ? 'visible' : 'none' },
         paint: {
-          'fill-color': [
-            'match',
-            ['get', 'grade'],
-            'steep', '#ef4444',
-            'moderate', '#f59e0b',
-            'gentle', '#10b981',
-            '#64748b'
-          ],
-          'fill-opacity': 0.38
+          'fill-color': ['match', ['get', 'grade'], 'moderate', '#f59e0b', 'steep', '#ef4444', '#10b981'],
+          'fill-opacity': 0.36
         }
       });
-
       map.addLayer({
-        id: 'slopes-line',
-        type: 'line',
-        source: 'slopes-source',
-        layout: {
-          visibility: layers.slope ? 'visible' : 'none'
-        },
-        paint: {
-          'line-color': [
-            'match',
-            ['get', 'grade'],
-            'steep', '#dc2626',
-            'moderate', '#d97706',
-            'gentle', '#059669',
-            '#475569'
-          ],
-          'line-width': 1.5,
-          'line-dasharray': [2, 2]
-        }
+        id: 'slopes-line', type: 'line', source: 'slopes-source',
+        layout: { visibility: layers.slope ? 'visible' : 'none' },
+        paint: { 'line-color': '#f59e0b', 'line-width': 1.5, 'line-dasharray': [2, 2] }
       });
 
-      // 2. Add Hazards Layer
-      map.addSource('hazards-source', {
-        type: 'geojson',
-        data: HAZARDS_GEOJSON
-      });
-
+      map.addSource('hazards-source', { type: 'geojson', data: HAZARDS_GEOJSON });
       map.addLayer({
-        id: 'hazards-fill',
-        type: 'fill',
-        source: 'hazards-source',
-        layout: {
-          visibility: layers.hazard ? 'visible' : 'none'
-        },
-        paint: {
-          'fill-color': '#e11d48',
-          'fill-opacity': 0.42
-        }
+        id: 'hazards-fill', type: 'fill', source: 'hazards-source',
+        layout: { visibility: layers.hazard ? 'visible' : 'none' },
+        paint: { 'fill-color': '#e11d48', 'fill-opacity': 0.42 }
       });
-
       map.addLayer({
-        id: 'hazards-outline',
-        type: 'line',
-        source: 'hazards-source',
-        layout: {
-          visibility: layers.hazard ? 'visible' : 'none'
-        },
-        paint: {
-          'line-color': '#fb7185',
-          'line-width': 2.5,
-          'line-dasharray': [3, 2]
-        }
+        id: 'hazards-outline', type: 'line', source: 'hazards-source',
+        layout: { visibility: layers.hazard ? 'visible' : 'none' },
+        paint: { 'line-color': '#fb7185', 'line-width': 2.5, 'line-dasharray': [3, 2] }
       });
 
-      // 3. Add Minerals Layer (CRISM Spectrometer)
-      map.addSource('minerals-source', {
-        type: 'geojson',
-        data: MINERALS_GEOJSON
-      });
-
+      map.addSource('minerals-source', { type: 'geojson', data: MINERALS_GEOJSON });
       map.addLayer({
-        id: 'minerals-fill',
-        type: 'fill',
-        source: 'minerals-source',
-        layout: {
-          visibility: layers.mineral ? 'visible' : 'none'
-        },
-        paint: {
-          'fill-color': ['get', 'color'],
-          'fill-opacity': 0.45
-        }
+        id: 'minerals-fill', type: 'fill', source: 'minerals-source',
+        layout: { visibility: layers.mineral ? 'visible' : 'none' },
+        paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.4 }
       });
-
       map.addLayer({
-        id: 'minerals-outline',
-        type: 'line',
-        source: 'minerals-source',
-        layout: {
-          visibility: layers.mineral ? 'visible' : 'none'
-        },
-        paint: {
-          'line-color': ['get', 'color'],
-          'line-width': 2
-        }
+        id: 'minerals-outline', type: 'line', source: 'minerals-source',
+        layout: { visibility: layers.mineral ? 'visible' : 'none' },
+        paint: { 'line-color': ['get', 'color'], 'line-width': 2 }
       });
 
-      // 4. Add Normal Route Source & Layer
       map.addSource('route-normal-source', {
-        type: 'geojson',
-        data: {
-          type: 'Feature',
-          properties: { name: 'Python normal route' },
-          geometry: {
-            type: 'LineString',
-            coordinates: [GALE_BASE_COORDINATES, GALE_BASE_COORDINATES]
-          }
-        }
+        type: 'geojson', data: routeFeature(normalRoute, GALE_BASE_COORDINATES)
       });
-
       map.addLayer({
-        id: 'route-normal-glow',
-        type: 'line',
-        source: 'route-normal-source',
-        layout: {
-          'line-cap': 'round',
-          'line-join': 'round'
-        },
-        paint: {
-          'line-color': '#00e5ff',
-          'line-width': 8,
-          'line-opacity': isEmergency ? 0.2 : 0.45,
-          'line-blur': 4
-        }
+        id: 'route-normal-glow', type: 'line', source: 'route-normal-source',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#00e5ff', 'line-width': 9, 'line-opacity': 0.45, 'line-blur': 4 }
       });
-
       map.addLayer({
-        id: 'route-normal-core',
-        type: 'line',
-        source: 'route-normal-source',
-        layout: {
-          'line-cap': 'round',
-          'line-join': 'round'
-        },
-        paint: {
-          'line-color': '#38bdf8',
-          'line-width': 3.5,
-          'line-opacity': isEmergency ? 0.35 : 0.95,
-          'line-dasharray': isEmergency ? [2, 3] : [1]
-        }
+        id: 'route-normal-core', type: 'line', source: 'route-normal-source',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#38bdf8', 'line-width': 3.5, 'line-opacity': 0.95 }
       });
 
-      // 5. Add Emergency Return Route Source & Layer
       map.addSource('route-emergency-source', {
-        type: 'geojson',
-        data: {
-          type: 'Feature',
-          properties: { name: 'Python emergency route' },
-          geometry: {
-            type: 'LineString',
-            coordinates: [BOXWORK_TARGET_COORDINATES, BOXWORK_TARGET_COORDINATES]
-          }
-        }
+        type: 'geojson', data: routeFeature(emergencyRoute, BOXWORK_TARGET_COORDINATES)
       });
-
       map.addLayer({
-        id: 'route-emergency-glow',
-        type: 'line',
-        source: 'route-emergency-source',
-        layout: {
-          'line-cap': 'round',
-          'line-join': 'round'
-        },
-        paint: {
-          'line-color': '#ef4444',
-          'line-width': isEmergency ? 12 : 5,
-          'line-opacity': isEmergency ? 0.7 : 0.2,
-          'line-blur': isEmergency ? 6 : 2
-        }
+        id: 'route-emergency-glow', type: 'line', source: 'route-emergency-source',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#ef4444', 'line-width': 5, 'line-opacity': 0.2, 'line-blur': 3 }
       });
-
       map.addLayer({
-        id: 'route-emergency-core',
-        type: 'line',
-        source: 'route-emergency-source',
-        layout: {
-          'line-cap': 'round',
-          'line-join': 'round'
-        },
-        paint: {
-          'line-color': '#f87171',
-          'line-width': isEmergency ? 4.5 : 2,
-          'line-dasharray': [3, 2],
-          'line-opacity': isEmergency ? 1.0 : 0.4
-        }
+        id: 'route-emergency-core', type: 'line', source: 'route-emergency-source',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#f87171', 'line-width': 2, 'line-opacity': 0.35, 'line-dasharray': [3, 2] }
       });
 
-      // Click event for interactive layers (hazards & minerals)
-      map.on('click', 'hazards-fill', (e) => {
-        if (!e.features || !e.features[0]) return;
-        const props = e.features[0].properties;
+      const showOverlayPopup = (event: MapLayerMouseEvent) => {
+        const properties = event.features?.[0]?.properties;
+        if (!properties) return;
+        const title = properties.type ?? properties.mineral ?? `Slope ${properties.slopeDeg ?? ''}°`;
+        const description = properties.warning ?? properties.description ?? properties.label ?? '';
         new Popup({ className: 'mars-tactical-popup' })
-          .setLngLat(e.lngLat)
-          .setHTML(`
-            <div style="background:#131a28; color:#fff; padding:10px; border-radius:6px; border:1px solid #ef4444; font-family:sans-serif; max-width:240px;">
-              <div style="color:#ef4444; font-weight:bold; font-size:12px; margin-bottom:4px;">⚠️ HAZARD ZONE: ${props?.type}</div>
-              <div style="font-size:11px; color:#cbd5e1; line-height:1.4;">${props?.warning}</div>
-            </div>
-          `)
+          .setLngLat(event.lngLat)
+          .setHTML(popupHtml('[SIMULATED MOCK DATA]', String(title), String(description), '#f59e0b'))
           .addTo(map);
-      });
+      };
+      map.on('click', 'hazards-fill', showOverlayPopup);
+      map.on('click', 'minerals-fill', showOverlayPopup);
+      map.on('click', 'slopes-fill', showOverlayPopup);
 
-      map.on('click', 'minerals-fill', (e) => {
-        if (!e.features || !e.features[0]) return;
-        const props = e.features[0].properties;
-        new Popup({ className: 'mars-tactical-popup' })
-          .setLngLat(e.lngLat)
-          .setHTML(`
-            <div style="background:#131a28; color:#fff; padding:10px; border-radius:6px; border:1px solid ${props?.color || '#00e5ff'}; font-family:sans-serif; max-width:240px;">
-              <div style="color:${props?.color || '#00e5ff'}; font-weight:bold; font-size:12px; margin-bottom:4px;">💎 CRISM: ${props?.mineral}</div>
-              <div style="font-size:11px; color:#cbd5e1; line-height:1.4;"><strong>Unit:</strong> ${props?.deposit}<br/>${props?.description}</div>
-            </div>
-          `)
-          .addTo(map);
-      });
+      const bounds = new LngLatBounds(GALE_BASE_COORDINATES, GALE_BASE_COORDINATES)
+        .extend(BOXWORK_TARGET_COORDINATES);
+      map.fitBounds(bounds, { padding: 120, maxZoom: 18.2, duration: 0 });
     });
 
-    // 6. Create Custom HTML Markers
-
-    // A. Gale Base Marker [137.419, -4.842]
-    const galeBaseEl = document.createElement('div');
-    galeBaseEl.className = 'mars-marker';
-    galeBaseEl.innerHTML = `
-      <div style="position:relative; display:flex; flex-direction:column; align-items:center;">
-        <div style="position:absolute; width:44px; height:44px; border-radius:50%; background:rgba(224,90,54,0.25); border:2px solid #ff5e36; animation:beaconPulse 2.2s infinite; pointer-events:none;"></div>
-        <div style="width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg, #ea580c, #c2410c); border:2px solid #fdba74; display:flex; align-items:center; justify-content:center; box-shadow:0 0 16px rgba(255,94,54,0.8); z-index:2;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 21h18"/>
-            <path d="M5 21V7l7-4 7 4v14"/>
-            <path d="M9 10h6v11H9z"/>
-          </svg>
-        </div>
-        <div style="margin-top:6px; background:rgba(15,23,42,0.92); border:1px solid #f97316; color:#fdba74; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:bold; white-space:nowrap; font-family:'JetBrains Mono',monospace; box-shadow:0 4px 12px rgba(0,0,0,0.6);">
-          [SIMULATED] GALE BASE ALPHA
-        </div>
-      </div>
-    `;
-
-    const galeBasePopup = new Popup({ offset: 25, closeButton: true })
-      .setHTML(`
-        <div style="background:#0c111d; color:#e2e8f0; padding:12px; border-radius:8px; border:1px solid #ff5e36; font-family:'JetBrains Mono',monospace; font-size:11px; max-width:260px;">
-          <div style="display:inline-block; background:rgba(245,158,11,0.2); border:1px solid #f59e0b; color:#fbbf24; font-size:9px; font-weight:bold; padding:2px 6px; border-radius:3px; margin-bottom:6px;">
-            SIMULATED FACILITY
-          </div>
-          <div style="color:#fdba74; font-weight:bold; font-size:13px; font-family:'Chakra Petch',sans-serif; margin-bottom:4px;">
-            GALE BASE ALPHA (HAB-1)
-          </div>
-          <div style="color:#94a3b8; font-size:11px; margin-bottom:6px;">
-            Coordinates: <strong>137.419° E, 4.842° S</strong><br/>
-            Elevation: <strong>-4,420 m</strong> (Datum)<br/>
-            Life Support: <span style="color:#10b981;">NOMINAL 100%</span><br/>
-            Airlocks: <strong>Airlock-1 READY</strong>
-          </div>
-          <div style="font-size:10px; color:#cbd5e1; border-top:1px solid #334155; pt-2; line-height:1.3;">
-            Primary planetary habitation module with pressurized garage and solar-nuclear hybrid microgrid.
-          </div>
-        </div>
-      `);
-
-    const galeBaseMarker = new Marker({ element: galeBaseEl })
+    const baseMarker = new Marker({
+      element: markerElement('⌂', '[SIMULATED] GALE ROVER BASE', '#fb923c')
+    })
       .setLngLat(GALE_BASE_COORDINATES)
-      .setPopup(galeBasePopup)
+      .setPopup(new Popup({ offset: 25 }).setHTML(popupHtml(
+        '[SIMULATED OPERATIONS POINT]',
+        'GALE ROVER BASE',
+        '137.38017231° E, 4.80425574° S<br/>DTM elevation: about -3,631.27 m<br/>Base cell: row 32, column 139',
+        '#fb923c'
+      )))
       .addTo(map);
 
-    // B. Boxwork Science-Target Marker [137.382, -4.892]
-    const boxworkEl = document.createElement('div');
-    boxworkEl.className = 'mars-marker';
-    boxworkEl.innerHTML = `
-      <div style="position:relative; display:flex; flex-direction:column; align-items:center;">
-        <div style="position:absolute; width:40px; height:40px; border-radius:50%; background:rgba(6,182,212,0.25); border:2px dashed #06b6d4; animation:spin 12s linear infinite; pointer-events:none;"></div>
-        <div style="width:32px; height:32px; border-radius:6px; background:linear-gradient(135deg, #0891b2, #0e7490); border:2px solid #67e8f9; display:flex; align-items:center; justify-content:center; box-shadow:0 0 16px rgba(6,182,212,0.8); z-index:2;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="12 2 19 8.5 19 15.5 12 22 5 15.5 5 8.5 12 2"/>
-            <line x1="12" y1="22" x2="12" y2="15.5"/>
-            <polyline points="22 8.5 12 15.5 2 8.5"/>
-          </svg>
-        </div>
-        <div style="margin-top:6px; background:rgba(15,23,42,0.92); border:1px solid #06b6d4; color:#67e8f9; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:bold; white-space:nowrap; font-family:'JetBrains Mono',monospace; box-shadow:0 4px 12px rgba(0,0,0,0.6);">
-          BOXWORK SCIENCE TARGET
-        </div>
-      </div>
-    `;
-
-    const boxworkPopup = new Popup({ offset: 25, closeButton: true })
-      .setHTML(`
-        <div style="background:#0c111d; color:#e2e8f0; padding:12px; border-radius:8px; border:1px solid #06b6d4; font-family:'JetBrains Mono',monospace; font-size:11px; max-width:270px;">
-          <div style="display:inline-block; background:rgba(6,182,212,0.2); border:1px solid #06b6d4; color:#67e8f9; font-size:9px; font-weight:bold; padding:2px 6px; border-radius:3px; margin-bottom:6px;">
-            SCIENCE PRIORITY 1
-          </div>
-          <div style="color:#67e8f9; font-weight:bold; font-size:13px; font-family:'Chakra Petch',sans-serif; margin-bottom:4px;">
-            MOUNT SHARP BOXWORK STRUCTURE
-          </div>
-          <div style="color:#94a3b8; font-size:11px; margin-bottom:6px;">
-            Coordinates: <strong>137.382° E, 4.892° S</strong><br/>
-            Elevation: <strong>-4,090 m</strong><br/>
-            Formation: <strong>Mineralized Boxwork Ridges</strong><br/>
-            Objective: <strong>Sample Core Extraction</strong>
-          </div>
-          <div style="font-size:10px; color:#cbd5e1; border-top:1px solid #334155; pt-2; line-height:1.3;">
-            Curiosity rover discovery: Web-like polygonal ridges formed by hydrothermal/groundwater mineral crystallization in ancient subsurface cracks, standing relief after wind deflated softer bedrock.
-          </div>
-        </div>
-      `);
-
-    const boxworkMarker = new Marker({ element: boxworkEl })
+    const targetMarker = new Marker({
+      element: markerElement('◆', '[CANDIDATE] SCIENCE TARGET', '#22d3ee')
+    })
       .setLngLat(BOXWORK_TARGET_COORDINATES)
-      .setPopup(boxworkPopup)
+      .setPopup(new Popup({ offset: 25 }).setHTML(popupHtml(
+        '[WAYPOINT-LINKED CANDIDATE]',
+        'SOL 4621 SCIENCE-TARGET CANDIDATE',
+        '137.37950662° E, 4.80541641° S<br/>DTM elevation: about -3,622.49 m<br/>Exact boxwork ridge at this coordinate is not confirmed.',
+        '#22d3ee'
+      )))
       .addTo(map);
 
-    // C. Astronaut EVA-1 Current Position Marker [137.396, -4.879]
-    const astronautEl = document.createElement('div');
-    astronautEl.className = 'mars-marker';
-    astronautEl.innerHTML = `
-      <div style="position:relative; display:flex; flex-direction:column; align-items:center;">
-        <div style="width:28px; height:28px; border-radius:50%; background:#059669; border:2px solid #34d399; display:flex; align-items:center; justify-content:center; box-shadow:0 0 14px rgba(16,185,129,0.9); z-index:2;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5">
-            <circle cx="12" cy="7" r="4"/>
-            <path d="M5.5 21v-3.5a4 4 0 0 1 4-4h5a4 4 0 0 1 4 4V21"/>
-          </svg>
-        </div>
-        <div style="margin-top:4px; background:rgba(6,78,59,0.9); border:1px solid #10b981; color:#a7f3d0; padding:1px 6px; border-radius:3px; font-size:9px; font-weight:bold; white-space:nowrap; font-family:'JetBrains Mono',monospace;">
-          EVA-1 (WATNEY)
-        </div>
-      </div>
-    `;
-
-    const astronautPopup = new Popup({ offset: 20, closeButton: true })
-      .setHTML(`
-        <div style="background:#06261f; color:#e2e8f0; padding:10px; border-radius:8px; border:1px solid #10b981; font-family:'JetBrains Mono',monospace; font-size:11px;">
-          <div style="color:#34d399; font-weight:bold; font-size:12px; margin-bottom:4px;">
-            ASTRONAUT M. WATNEY (EVA-1)
-          </div>
-          <div style="color:#94a3b8; font-size:10px;">
-            Position: 137.396° E, 4.879° S<br/>
-            Station: Vera Rubin Ridge Saddle<br/>
-            Elevation: -4,210 m
-          </div>
-        </div>
-      `);
-
-    const astronautMarker = new Marker({ element: astronautEl })
+    const roverMarker = new Marker({
+      element: markerElement('◈', '[SIMULATED] AER-1', '#34d399')
+    })
       .setLngLat(CURRENT_ROVER_COORDINATES)
-      .setPopup(astronautPopup)
+      .setPopup(new Popup({ offset: 25 }).setHTML(popupHtml(
+        '[SIMULATED ROVER POSITION]',
+        'AUTONOMOUS EXPLORATION ROVER AER-1',
+        'Demo position is colocated with the science-target candidate. Telemetry and rover state are simulated.',
+        '#34d399'
+      )))
       .addTo(map);
 
-    markersRef.current = [galeBaseMarker, boxworkMarker, astronautMarker];
+    markersRef.current = [baseMarker, targetMarker, roverMarker];
+
+    const resize = () => map.resize();
+    window.addEventListener('resize', resize);
+    const resizeTimers = [50, 250, 700].map((delay) => window.setTimeout(resize, delay));
 
     return () => {
-      markersRef.current.forEach(m => m.remove());
+      resizeTimers.forEach(window.clearTimeout);
+      window.removeEventListener('resize', resize);
+      markersRef.current.forEach((marker) => marker.remove());
+      markersRef.current = [];
       map.remove();
+      mapRef.current = null;
     };
+    // Route source updates are handled by the effects below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Update Layer Visibility dynamically
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const update = () => {
+      (map.getSource('route-normal-source') as GeoJSONSource | undefined)
+        ?.setData(routeFeature(normalRoute, GALE_BASE_COORDINATES));
+      (map.getSource('route-emergency-source') as GeoJSONSource | undefined)
+        ?.setData(routeFeature(emergencyRoute, BOXWORK_TARGET_COORDINATES));
+    };
+    if (map.isStyleLoaded()) update();
+    else map.once('load', update);
+  }, [normalRoute, emergencyRoute]);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-
-    // Optical Layer
-    if (map.getLayer('mars-raster-layer')) {
-      map.setLayoutProperty('mars-raster-layer', 'visibility', layers.optical ? 'visible' : 'none');
-    }
-
-    // Slope Layer
-    if (map.getLayer('slopes-fill')) {
-      map.setLayoutProperty('slopes-fill', 'visibility', layers.slope ? 'visible' : 'none');
-      map.setLayoutProperty('slopes-line', 'visibility', layers.slope ? 'visible' : 'none');
-    }
-
-    // Hazard Layer
-    if (map.getLayer('hazards-fill')) {
-      map.setLayoutProperty('hazards-fill', 'visibility', layers.hazard ? 'visible' : 'none');
-      map.setLayoutProperty('hazards-outline', 'visibility', layers.hazard ? 'visible' : 'none');
-    }
-
-    // Mineral Layer
-    if (map.getLayer('minerals-fill')) {
-      map.setLayoutProperty('minerals-fill', 'visibility', layers.mineral ? 'visible' : 'none');
-      map.setLayoutProperty('minerals-outline', 'visibility', layers.mineral ? 'visible' : 'none');
-    }
+    const setVisibility = (ids: string[], visible: boolean) => ids.forEach((id) => {
+      if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');
+    });
+    setVisibility(['mars-raster-layer'], layers.optical);
+    setVisibility(['slopes-fill', 'slopes-line'], layers.slope);
+    setVisibility(['hazards-fill', 'hazards-outline'], layers.hazard);
+    setVisibility(['minerals-fill', 'minerals-outline'], layers.mineral);
   }, [layers]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+    const update = () => {
+      if (!map.getLayer('route-normal-core')) return;
+      map.setPaintProperty('route-normal-glow', 'line-opacity', isEmergency ? 0.15 : 0.5);
+      map.setPaintProperty('route-normal-core', 'line-opacity', isEmergency ? 0.3 : 0.95);
+      map.setPaintProperty('route-emergency-glow', 'line-opacity', isEmergency ? 0.8 : 0.2);
+      map.setPaintProperty('route-emergency-glow', 'line-width', isEmergency ? 14 : 5);
+      map.setPaintProperty('route-emergency-core', 'line-opacity', isEmergency ? 1 : 0.35);
+      map.setPaintProperty('route-emergency-core', 'line-width', isEmergency ? 5 : 2);
 
-    const updateRouteSources = () => {
-      const normalSource = map.getSource('route-normal-source') as maplibregl.GeoJSONSource | undefined;
-      if (normalSource && normalRoute) {
-        normalSource.setData({
-          type: 'Feature',
-          properties: { name: normalRoute.name },
-          geometry: { type: 'LineString', coordinates: normalRoute.coordinates }
-        });
-      }
-
-      const emergencySource = map.getSource('route-emergency-source') as maplibregl.GeoJSONSource | undefined;
-      if (emergencySource && emergencyRoute) {
-        emergencySource.setData({
-          type: 'Feature',
-          properties: { name: emergencyRoute.name },
-          geometry: { type: 'LineString', coordinates: emergencyRoute.coordinates }
-        });
-      }
-    };
-
-    if (map.isStyleLoaded()) updateRouteSources();
-    else map.once('load', updateRouteSources);
-
-    return () => {
-      map.off('load', updateRouteSources);
-    };
-  }, [normalRoute, emergencyRoute]);
-
-  // Update Route Appearance when Emergency changes
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    const updateRoutePresentation = () => {
-      if (map.getLayer('route-normal-glow')) {
-        map.setPaintProperty('route-normal-glow', 'line-opacity', isEmergency ? 0.15 : 0.45);
-        map.setPaintProperty('route-normal-core', 'line-opacity', isEmergency ? 0.3 : 0.95);
-        map.setPaintProperty('route-normal-core', 'line-dasharray', isEmergency ? [2, 3] : [1]);
-      }
-
-      if (map.getLayer('route-emergency-glow')) {
-        map.setPaintProperty('route-emergency-glow', 'line-opacity', isEmergency ? 0.8 : 0.2);
-        map.setPaintProperty('route-emergency-glow', 'line-width', isEmergency ? 14 : 5);
-        map.setPaintProperty('route-emergency-core', 'line-opacity', isEmergency ? 1.0 : 0.4);
-        map.setPaintProperty('route-emergency-core', 'line-width', isEmergency ? 5 : 2);
-      }
-
-      const activeCoordinates = isEmergency ? emergencyRoute?.coordinates : normalRoute?.coordinates;
-      if (activeCoordinates && activeCoordinates.length >= 2) {
-        const bounds = activeCoordinates.reduce(
-          (currentBounds, coordinate) => currentBounds.extend(coordinate),
-          new maplibregl.LngLatBounds(activeCoordinates[0], activeCoordinates[0])
+      const coordinates = isEmergency ? emergencyRoute?.coordinates : normalRoute?.coordinates;
+      if (coordinates && coordinates.length >= 2) {
+        const bounds = coordinates.reduce(
+          (current, coordinate) => current.extend(coordinate),
+          new LngLatBounds(coordinates[0], coordinates[0])
         );
-        map.fitBounds(bounds, { padding: 70, maxZoom: 16, duration: 1200 });
+        map.fitBounds(bounds, { padding: 120, maxZoom: 18.4, duration: 900 });
       }
     };
-
-    if (map.isStyleLoaded()) updateRoutePresentation();
-    else map.once('load', updateRoutePresentation);
-
-    return () => {
-      map.off('load', updateRoutePresentation);
-    };
+    if (map.isStyleLoaded()) update();
+    else map.once('load', update);
   }, [isEmergency, normalRoute, emergencyRoute]);
 
-  // Pan to focused coordinates if requested
   useEffect(() => {
-    if (!focusedCoordinates || !mapRef.current) return;
-    mapRef.current.flyTo({
-      center: focusedCoordinates,
-      zoom: 14.2,
-      pitch: 30,
-      duration: 1200
-    });
+    const map = mapRef.current;
+    if (!map || !focusedCoordinates) return;
+    map.flyTo({ center: focusedCoordinates, zoom: 19, pitch: 42, duration: 900 });
     onClearFocus();
   }, [focusedCoordinates, onClearFocus]);
 
   return (
-    <div className="relative w-full h-full min-h-[420px] rounded-xl overflow-hidden border border-orange-500/30 shadow-2xl bg-slate-950">
-      {/* MapLibre DOM Container */}
-      <div ref={mapContainerRef} className="w-full h-full" />
-
-      {/* Floating Tactical Overlay Compass & Coordinate Badge */}
-      <div className="absolute top-3 left-3 z-10 tactical-panel rounded-lg px-2.5 py-1.5 flex items-center gap-2 text-[10px] font-mono text-slate-300 pointer-events-none">
-        <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-        <span>SECTOR: AEOLIS PALUS / MOUNT SHARP</span>
-        <span className="text-slate-600">|</span>
-        <span className="text-cyan-400">GALE CRATER GRID</span>
+    <div className="absolute inset-0 overflow-hidden rounded-xl border border-orange-500/25 bg-slate-950">
+      <div ref={mapContainerRef} className="absolute inset-0" />
+      <div className="absolute left-3 top-3 z-10 max-w-[280px] rounded-lg border border-slate-700 bg-slate-950/90 p-2.5 font-mono text-[10px] shadow-xl backdrop-blur">
+        <div className="mb-1 font-aerospace text-xs font-bold text-orange-300">GALE CRATER ROUTING DEMO</div>
+        <div className="text-slate-300">HiRISE crop: 201 × 201 cells • 1.012 m/cell</div>
+        <div className="text-slate-400">Route: live Python weighted A*</div>
+        <div className="mt-1 border-t border-slate-800 pt-1 text-slate-500">Basemap: NASA/USGS-derived • Polygons: simulated</div>
       </div>
-
-      {/* Route Legend Indicator Overlay */}
-      <div className="absolute bottom-3 right-3 z-10 tactical-panel rounded-lg px-3 py-2 text-xs font-mono select-none hidden sm:block">
-        <div className="text-[10px] font-aerospace font-bold text-slate-400 mb-1">
-          TRAVERSE VECTORS
+      <div className="absolute bottom-8 right-3 z-10 rounded-lg border border-slate-700 bg-slate-950/90 p-2.5 font-mono text-[10px] shadow-xl backdrop-blur">
+        <div className={isEmergency ? 'text-slate-500' : 'font-semibold text-cyan-300'}>
+          <span className="mr-2 inline-block h-1 w-3.5 rounded bg-cyan-400" />
+          Planned traverse ({normalRoute ? `${normalRoute.distanceM.toFixed(1)} m` : 'loading'})
         </div>
-        <div className="space-y-1 text-[11px]">
-          <div className="flex items-center gap-2">
-            <span className={`w-3.5 h-1 rounded ${isEmergency ? 'bg-cyan-500/40' : 'bg-cyan-400 shadow-sm shadow-cyan-400'}`} />
-            <span className={isEmergency ? 'text-slate-500' : 'text-cyan-300 font-semibold'}>
-              Normal Route (Planned)
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className={`w-3.5 h-1 rounded ${isEmergency ? 'bg-red-500 shadow-sm shadow-red-500' : 'bg-red-500/40'}`} />
-            <span className={isEmergency ? 'text-red-400 font-bold emergency-flash' : 'text-slate-500'}>
-              Emergency Return Vector
-            </span>
-          </div>
+        <div className={isEmergency ? 'mt-1 font-bold text-red-400' : 'mt-1 text-slate-500'}>
+          <span className="mr-2 inline-block h-1 w-3.5 rounded bg-red-500" />
+          Contingency return ({emergencyRoute ? `${emergencyRoute.distanceM.toFixed(1)} m` : 'not calculated'})
         </div>
       </div>
     </div>

@@ -1,67 +1,59 @@
-# Mars Walk Guardian - Frontend & Interactive Map
+# Mars Rover Guardian
 
-An aerospace tactical Mission Operations interface for Mars astronaut extravehicular activity (EVA) navigation and contingency management around Mount Sharp (Aeolis Mons) in Gale Crater.
+Mars Rover Guardian is a NASA Space Apps MVP that plans a rover traverse through a local Gale Crater terrain crop. It combines a React/MapLibre mission interface with a Python FastAPI service and weighted A* routing.
 
-Built with **React**, **TypeScript**, **Vite**, **MapLibre GL JS**, and **Tailwind CSS**.
+## What the demo does
 
----
+- Loads a cached 201 × 201 HiRISE DTM crop at approximately 1.012 metres per cell.
+- Plans a live outbound route from a simulated rover base at row 32, column 139 to a science-target candidate at row 100, column 100.
+- Rejects blocked or unsafe cells before comparing weighted terrain costs.
+- Reports physical distance and battery energy separately from the normalized route-risk score.
+- Injects a blocked cell during an emergency simulation and recalculates a feasible route back to base.
+- Labels simulated telemetry and illustrative map overlays separately from measured or derived terrain data.
 
-## 🌟 Key Features
+## Demonstration locations
 
-1. **Mount Sharp & Gale Crater Interactive Map**:
-   - Centered on Mount Sharp in Gale Crater (`[137.405°E, -4.865°S]`).
-   - Powered by **MapLibre GL JS** with OpenPlanetary USGS/NASA Mars Basemap raster tiles.
-2. **Simulated Gale Base Marker**:
-   - Geodesic habitat marker stationed at `[137.419°E, -4.842°S]` with beacon pulse animation and interactive airlock/life-support telemetry.
-   - Clearly badged as **`[SIMULATED]`**.
-3. **Boxwork Science-Target Marker**:
-   - Positioned at `[137.382°E, -4.892°S]` on the slopes of Mount Sharp, highlighting ancient groundwater polygonal fracture mineralization.
-4. **Dual Traverse Routes**:
-   - **Planned Scientific Traverse (Normal Route)**: Traverses alluvial fans, Vera Rubin Ridge, and basalt hardpan corridors with elevation profiles and waypoint checkpoints.
-   - **Emergency Return Vector**: Rapid downhill egress path bypassing loose Bagnold dunes and rockfalls.
-5. **Simulate Emergency Action**:
-   - Tactical HUD toggle triggering instant route recalculation, high-alert visual states, and life-support stress telemetry.
-6. **Simulated Suit Telemetry HUD**:
-   - **Oxygen**: Percentage, consumption rate (L/min), pressure (kPa), and remaining hours.
-   - **Battery**: Percentage, voltage (V), power draw (W), and remaining hours.
-   - **Temperature**: Core suit internal temp vs. cryogenic ambient Mars surface temp (-62°C).
-   - **Daylight & Martian Sol**: Sol 424 countdown, local solar time (LMST), and solar elevation angle.
-7. **Multi-Channel Layer Toggles**:
-   - **Optical**: Planetary surface imagery.
-   - **Slope**: Gradient hazard zones (Safe `<10°`, Moderate `10-25°`, Scarp `>25°`).
-   - **Hazards**: High-slip Bagnold dune slipfaces and dense boulder clast fields.
-   - **Minerals**: CRISM spectrometer heatmap (Sulfates, Clays, Hematite).
-8. **Route Explanation & Waypoint Panel**:
-   - Distance, travel time, elevation delta, maximum slope, terrain composition, and click-to-locate waypoints.
+| Location | Grid cell | Coordinates | Status |
+| --- | --- | --- | --- |
+| Gale Rover Base | (32, 139) | 137.38017231° E, 4.80425574° S | Simulated operations point |
+| Science target | (100, 100) | 137.37950662° E, 4.80541641° S | Sol 4621 waypoint-linked candidate; exact boxwork ridge unconfirmed |
 
----
+The baseline route is about 86 metres. Exact results come from the Python route response rather than a hard-coded frontend path.
 
-## 🚀 Quickstart
+## Energy model
 
-### Prerequisites
-- Node.js (v18+)
-- npm
+The fictional rover demo uses a 100 Wh battery, a 10 Wh reserve, and a baseline physical driving cost of 0.25 Wh/m. The UI shows a 45 W nominal additional driving load. These values are project assumptions, not specifications for a real NASA rover.
 
-### Development Server
-```bash
+## Run locally
+
+Open two terminals in the repository root.
+
+Backend:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+uvicorn backend.app.main:app --reload --port 8000
+```
+
+Frontend:
+
+```powershell
 npm install
 npm run dev
 ```
-Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-### Production Build
-```bash
+Open the Vite URL shown in the terminal, normally `http://localhost:5173`. The API health endpoint is `http://127.0.0.1:8000/health`.
+
+## Verify
+
+```powershell
 npm run build
-npm run preview
+.\.venv\Scripts\python.exe -m unittest discover -s backend\tests -v
 ```
 
----
+## Data boundary
 
-## 🛰️ Architecture & Tech Stack
-
-- **Framework**: React 19 + TypeScript
-- **Bundler**: Vite
-- **Mapping**: MapLibre GL JS
-- **Styling**: Tailwind CSS + Custom Mars HUD Glassmorphism
-- **Icons**: Lucide React
-- **Branch**: `feature/map-interface`
+- HiRISE supplies local elevation input and derived roughness/slope values.
+- MOLA is regional context only.
+- CRISM may support science-region selection, but local overlap is not yet verified.
+- Slip risk, blocked defaults, rover telemetry, mineral polygons, and hazard overlays are explicitly simulated placeholders.

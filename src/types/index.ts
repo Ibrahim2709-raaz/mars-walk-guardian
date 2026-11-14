@@ -1,4 +1,4 @@
-export type LatLng = [number, number]; // [lng, lat] for MapLibre standard
+﻿export type LatLng = [number, number]; // [lng, lat] for MapLibre standard
 
 export interface Waypoint {
   id: string;
@@ -16,7 +16,7 @@ export interface RouteData {
   name: string;
   type: 'normal' | 'emergency';
   color: string;
-  distanceKm: number;
+  distanceM: number;
   estimatedMinutes: number;
   elevationGainMeters: number;
   maxSlopeDeg: number;
@@ -24,42 +24,48 @@ export interface RouteData {
   rationale: string;
   waypoints: Waypoint[];
   coordinates: LatLng[];
+  provenance: 'SYSTEM-DERIVED';
 }
 
-export interface SuitTelemetry {
+export interface RoverTelemetry {
   isSimulated: boolean;
-  astronautName: string;
-  suitId: string;
-  missionStatus: 'NOMINAL' | 'EMERGENCY_RETURN';
-  oxygen: {
-    percentage: number;
-    consumptionLitersPerMin: number;
-    hoursRemaining: number;
-    pressureKPa: number;
-    status: 'optimal' | 'warning' | 'critical';
-  };
-  battery: {
-    percentage: number;
-    powerDrawWatts: number;
-    voltage: number;
-    hoursRemaining: number;
-    status: 'optimal' | 'warning' | 'critical';
-  };
-  temperature: {
+  roverId: string;
+  roverName: string;
+  missionStatus: 'NOMINAL' | 'SIMULATED_EMERGENCY';
+  batteryRemainingWh: number;
+  batteryCapacityWh: number;
+  batteryPercentage: number;
+  energyConsumptionW: number;
+  energyRateWhPerM: number;
+  roverTemperature: {
     internalCelsius: number;
     externalCelsius: number;
-    heaterDutyCyclePercent: number;
     status: 'optimal' | 'warning' | 'critical';
   };
-  daylight: {
-    sol: number;
-    localSolarTime: string; // e.g. "14:42 LMST"
-    solarElevationDeg: number;
-    hoursDaylightRemaining: number;
-    isDuskApproaching: boolean;
+  wheelSlipRisk: {
+    percentage: number;
+    level: 'LOW' | 'MEDIUM' | 'HIGH';
+    status: 'optimal' | 'warning' | 'critical';
   };
-  heartRateBpm: number;
-  radiationMicroSvPerHour: number;
+  communicationStatus: {
+    relay: string;
+    signalStrengthPercent: number;
+    uplinkBandwidthKbps: number;
+    latencyMinutes: number;
+    status: 'connected' | 'degraded' | 'loss_of_signal';
+  };
+  speedCmPerSec: number;
+  missionTime: {
+    sol: number;
+    localSolarTime: string; // e.g. "14:38 LMST"
+    missionElapsedHours: string; // e.g. "184:22:15"
+  };
+  faultStatus: {
+    hasFault: boolean;
+    code: string;
+    description: string;
+    severity: 'NONE' | 'WARNING' | 'CRITICAL';
+  };
 }
 
 export interface LayerVisibility {
@@ -73,9 +79,43 @@ export interface ScienceMarker {
   id: string;
   name: string;
   coordinates: LatLng;
-  category: 'base' | 'boxwork_target' | 'hazard' | 'astronaut';
+  category: 'base' | 'boxwork_target' | 'hazard' | 'rover';
   elevation: number;
   label: string;
   isSimulated: boolean;
+  provenance: 'NASA-DERIVED' | 'SYSTEM-DERIVED' | 'SIMULATED MOCK DATA';
   geologicalSignificance: string;
+}
+
+export interface RoverState {
+  batteryRemainingWh: number;
+  energyConsumptionW: number;
+  speedCmPerSec: number;
+  currentSlopeDeg?: number;
+  wheelSlipRiskPercent?: number;
+}
+
+export interface RouteCalculationResult {
+  path: LatLng[];
+  distanceM: number;
+  energyWh: number;
+  riskScore: number;
+  batteryRemainingWh: number;
+  warnings: string[];
+  feasible: boolean;
+}
+
+export interface TerrainGrid {
+  id: string;
+  resolutionM: number;
+  rows: number;
+  cols: number;
+  bounds: {
+    minLng: number;
+    maxLng: number;
+    minLat: number;
+    maxLat: number;
+  };
+  cells?: number[][];
+  isSimulated: boolean;
 }

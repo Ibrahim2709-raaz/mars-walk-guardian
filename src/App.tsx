@@ -1,39 +1,51 @@
-import React, { useState, useEffect } from 'react';
-import { Header } from './components/Header';
-import { MarsMap } from './components/MarsMap';
-import { TelemetryHUD } from './components/TelemetryHUD';
-import { LayerControls } from './components/LayerControls';
+import React, { useEffect, useState } from 'react';
 import { EmergencyControl } from './components/EmergencyControl';
+import { Header } from './components/Header';
+import { LayerControls } from './components/LayerControls';
+import { MarsMap } from './components/MarsMap';
 import { RouteExplanation } from './components/RouteExplanation';
+import { TelemetryHUD } from './components/TelemetryHUD';
 import {
-  GALE_BASE_COORDINATES,
-  BOXWORK_TARGET_COORDINATES
+  BOXWORK_TARGET_COORDINATES,
+  CURRENT_ROVER_COORDINATES,
+  GALE_BASE_COORDINATES
 } from './data/marsGeoData';
+import { EMERGENCY_ROVER_TELEMETRY, NOMINAL_ROVER_TELEMETRY } from './data/mockTelemetry';
+import { BASE_POSITION, SCIENCE_TARGET_POSITION, TERRAIN_CELL_SIZE_M } from './data/terrainSites';
+import { calculateTerrainRoute, RouteResult } from './services/routingApi';
 import {
-  BASE_POSITION,
-  SCIENCE_TARGET_POSITION,
-  TERRAIN_CELL_SIZE_M
-} from './data/terrainSites';
-import { NOMINAL_TELEMETRY, EMERGENCY_TELEMETRY } from './data/mockTelemetry';
-import { LayerVisibility, LatLng, RouteData, SuitTelemetry, Waypoint } from './types';
-import {
-  calculateTerrainRoute,
-  RouteResult,
-} from './services/routingApi';
+  LatLng,
+  LayerVisibility,
+  RouteCalculationResult,
+  RouteData,
+  RoverTelemetry,
+  Waypoint
+} from './types';
 
 const EMPTY_ROUTE: RouteData = {
   id: 'route-loading',
   name: 'Waiting for Python routing service',
   type: 'normal',
   color: '#38bdf8',
-  distanceKm: 0,
+  distanceM: 0,
   estimatedMinutes: 0,
   elevationGainMeters: 0,
   maxSlopeDeg: 0,
   status: 'standby',
-  rationale: 'Requesting a feasible route from the Python weighted A* service.',
+  rationale: 'Loading the cached HiRISE terrain grid and requesting a weighted A* route.',
   coordinates: [GALE_BASE_COORDINATES, GALE_BASE_COORDINATES],
-  waypoints: []
+  waypoints: [],
+  provenance: 'SYSTEM-DERIVED'
+};
+
+const EMPTY_CALCULATION: RouteCalculationResult = {
+  path: [GALE_BASE_COORDINATES, GALE_BASE_COORDINATES],
+  distanceM: 0,
+  energyWh: 0,
+  riskScore: 0,
+  batteryRemainingWh: 100,
+  warnings: ['Waiting for the Python terrain-routing service.'],
+  feasible: false
 };
 
 function routeResultToRouteData(result: RouteResult, type: 'normal' | 'emergency'): RouteData {
@@ -61,16 +73,16 @@ function routeResultToRouteData(result: RouteResult, type: 'normal' | 'emergency
   const waypoints: Waypoint[] = selectedCells.map((cell, index) => ({
     id: `${type}-wp-${cell.row}-${cell.column}`,
     name: index === 0
-      ? type === 'emergency' ? 'Rover fault position' : 'Simulated operations point'
+      ? type === 'emergency' ? 'Rover fault position' : 'Gale Rover Base — Simulated Operations Point'
       : index === selectedCells.length - 1
-      ? type === 'emergency' ? 'Simulated operations point' : 'Boxwork science target'
-      : `Grid checkpoint ${cell.row},${cell.column}`,
+      ? type === 'emergency' ? 'Gale Rover Base — Simulated Operations Point' : 'Sol 4621 science-target candidate'
+      : `Terrain-grid checkpoint ${cell.row},${cell.column}`,
     coordinates: [cell.longitude, cell.latitude],
     elevationMeters: Number(cell.elevation_m.toFixed(2)),
     slopeGradeDeg: Number((cell.cross_slope_deg ?? 0).toFixed(1)),
-    terrainType: cell.blocked ? 'Blocked terrain' : cell.roughness > 0.5 ? 'Rough regolith' : 'Traversable regolith',
+    terrainType: cell.roughness > 0.5 ? 'Rough DTM cell' : 'Traversable DTM cell',
     hazardLevel: cell.slip_risk > 0.6 ? 'HIGH' : cell.roughness > 0.5 ? 'MEDIUM' : 'LOW',
-    description: `Python grid cell (${cell.row}, ${cell.column}); slip risk ${cell.slip_risk.toFixed(2)}.`
+    description: `HiRISE terrain cell (${cell.row}, ${cell.column}); simulated slip risk ${cell.slip_risk.toFixed(2)}.`
   }));
 
   return {
@@ -78,7 +90,7 @@ function routeResultToRouteData(result: RouteResult, type: 'normal' | 'emergency
     name: type === 'emergency' ? 'Python emergency return route' : 'Python planned science route',
     type,
     color: type === 'emergency' ? '#ef4444' : '#38bdf8',
-    distanceKm: Number((result.distance_m / 1000).toFixed(3)),
+    distanceM: Number(result.distance_m.toFixed(2)),
     estimatedMinutes: Math.ceil(result.distance_m / 3),
     elevationGainMeters: Number(elevationGainMeters.toFixed(1)),
     maxSlopeDeg: Number(maxSlopeDeg.toFixed(1)),
@@ -88,24 +100,38 @@ function routeResultToRouteData(result: RouteResult, type: 'normal' | 'emergency
       `battery remaining ${result.battery_remaining_wh.toFixed(2)} Wh.` +
       (result.warnings.length ? ` Warning: ${result.warnings.join(' ')}` : ''),
     coordinates: coordinates.length >= 2 ? coordinates : [GALE_BASE_COORDINATES, GALE_BASE_COORDINATES],
-    waypoints
+    waypoints,
+    provenance: 'SYSTEM-DERIVED'
+  };
+}
+
+function routeResultToCalculation(result: RouteResult): RouteCalculationResult {
+  return {
+    path: result.path.map((cell): LatLng => [cell.longitude, cell.latitude]),
+    distanceM: Number(result.distance_m.toFixed(2)),
+    energyWh: Number(result.energy_wh.toFixed(2)),
+    riskScore: result.risk_score,
+    batteryRemainingWh: result.battery_remaining_wh,
+    warnings: result.warnings,
+    feasible: result.feasible
   };
 }
 
 export const App: React.FC = () => {
-  const [isEmergency, setIsEmergency] = useState<boolean>(false);
+  const [isEmergency, setIsEmergency] = useState(false);
   const [layers, setLayers] = useState<LayerVisibility>({
     optical: true,
     slope: true,
     hazard: true,
     mineral: false
   });
-  const [telemetry, setTelemetry] = useState<SuitTelemetry>(NOMINAL_TELEMETRY);
+  const [telemetry, setTelemetry] = useState<RoverTelemetry>(NOMINAL_ROVER_TELEMETRY);
   const [focusedCoordinates, setFocusedCoordinates] = useState<LatLng | null>(null);
   const [normalRoute, setNormalRoute] = useState<RouteData | null>(null);
   const [emergencyRoute, setEmergencyRoute] = useState<RouteData | null>(null);
   const [normalRouteResult, setNormalRouteResult] = useState<RouteResult | null>(null);
-  const [isRouting, setIsRouting] = useState<boolean>(true);
+  const [emergencyRouteResult, setEmergencyRouteResult] = useState<RouteResult | null>(null);
+  const [isRouting, setIsRouting] = useState(true);
   const [routingError, setRoutingError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -138,11 +164,10 @@ export const App: React.FC = () => {
   const handleToggleEmergency = async () => {
     if (isEmergency) {
       setIsEmergency(false);
-      setTelemetry(NOMINAL_TELEMETRY);
+      setTelemetry(NOMINAL_ROVER_TELEMETRY);
       setRoutingError(null);
       return;
     }
-
     if (!normalRouteResult) {
       setRoutingError('The outbound route must load before an emergency can be simulated.');
       return;
@@ -152,7 +177,6 @@ export const App: React.FC = () => {
     setRoutingError(null);
     try {
       const rerouteCell = normalRouteResult.path[Math.floor(normalRouteResult.path.length / 2)];
-
       const result = await calculateTerrainRoute({
         start: SCIENCE_TARGET_POSITION,
         target: BASE_POSITION,
@@ -164,9 +188,10 @@ export const App: React.FC = () => {
         blocked_cells: rerouteCell ? [{ row: rerouteCell.row, column: rerouteCell.column }] : []
       });
       if (!result.feasible) throw new Error(result.reason ?? 'No feasible emergency return route.');
+      setEmergencyRouteResult(result);
       setEmergencyRoute(routeResultToRouteData(result, 'emergency'));
       setIsEmergency(true);
-      setTelemetry(EMERGENCY_TELEMETRY);
+      setTelemetry(EMERGENCY_ROVER_TELEMETRY);
     } catch (error) {
       setRoutingError(error instanceof Error ? error.message : 'Emergency routing failed.');
     } finally {
@@ -174,71 +199,50 @@ export const App: React.FC = () => {
     }
   };
 
-  // Toggle Map Layer
-  const handleToggleLayer = (layerKey: keyof LayerVisibility) => {
-    setLayers((prev) => ({
-      ...prev,
-      [layerKey]: !prev[layerKey]
-    }));
-  };
-
-  // Center on Gale Base
-  const handleCenterBase = () => {
-    setFocusedCoordinates(GALE_BASE_COORDINATES);
-  };
-
-  // Center on Boxwork Target
-  const handleCenterTarget = () => {
-    setFocusedCoordinates(BOXWORK_TARGET_COORDINATES);
-  };
-
-  // Center on any waypoint
-  const handleSelectWaypoint = (coords: LatLng) => {
-    setFocusedCoordinates(coords);
-  };
-
-  // Minor simulated telemetry tick to make suit sensors feel live
   useEffect(() => {
     const interval = setInterval(() => {
-      setTelemetry((prev) => {
-        const jitter = (Math.random() - 0.5) * 0.05;
-        const hrJitter = Math.floor((Math.random() - 0.5) * 3);
+      setTelemetry((previous) => {
+        const energyConsumptionW = Math.max(
+          35,
+          Math.min(70, previous.energyConsumptionW + Math.floor((Math.random() - 0.5) * 4))
+        );
+        const batteryRemainingWh = Math.max(
+          previous.batteryCapacityWh * 0.1,
+          Number((previous.batteryRemainingWh - 0.01).toFixed(2))
+        );
         return {
-          ...prev,
-          heartRateBpm: Math.max(60, Math.min(170, prev.heartRateBpm + hrJitter)),
-          oxygen: {
-            ...prev.oxygen,
-            percentage: Math.max(10, Number((prev.oxygen.percentage - 0.005 + jitter * 0.01).toFixed(2)))
-          },
-          battery: {
-            ...prev.battery,
-            percentage: Math.max(10, Number((prev.battery.percentage - 0.003).toFixed(2)))
-          }
+          ...previous,
+          batteryRemainingWh,
+          batteryPercentage: Number((batteryRemainingWh / previous.batteryCapacityWh * 100).toFixed(1)),
+          energyConsumptionW
         };
       });
-    }, 4000);
-
+    }, 3500);
     return () => clearInterval(interval);
   }, []);
 
   const activeRoute = isEmergency ? emergencyRoute ?? EMPTY_ROUTE : normalRoute ?? EMPTY_ROUTE;
+  const activeResult = isEmergency ? emergencyRouteResult : normalRouteResult;
+  const routeCalculation = activeResult
+    ? routeResultToCalculation(activeResult)
+    : { ...EMPTY_CALCULATION, warnings: routingError ? [routingError] : EMPTY_CALCULATION.warnings };
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 font-sans">
-      {/* Top Tactical Mission Control Header */}
       <Header
         telemetry={telemetry}
         isEmergency={isEmergency}
-        onCenterBase={handleCenterBase}
-        onCenterTarget={handleCenterTarget}
+        onCenterBase={() => setFocusedCoordinates(GALE_BASE_COORDINATES)}
+        onCenterTarget={() => setFocusedCoordinates(BOXWORK_TARGET_COORDINATES)}
+        onCenterRover={() => setFocusedCoordinates(CURRENT_ROVER_COORDINATES)}
       />
 
-      {/* Main Tactical Dashboard Body */}
-      <main className="flex-1 p-2 md:p-4 grid grid-cols-1 lg:grid-cols-12 gap-3 overflow-y-auto lg:overflow-hidden">
-        {/* Left / Center Map Section (8 Columns on desktop) */}
-        <section className="lg:col-span-8 flex flex-col gap-3 min-h-[460px] lg:h-full">
-          {/* Interactive MapLibre Mars Map */}
-          <div className="flex-1 relative min-h-[360px] rounded-xl overflow-hidden">
+      <main
+        className="flex-1 p-2 md:p-4 grid grid-cols-1 lg:grid-cols-12 gap-3 overflow-y-auto lg:overflow-hidden"
+        style={{ minHeight: 0 }}
+      >
+        <section className="lg:col-span-8 flex flex-col gap-3" style={{ minHeight: '540px', height: '100%' }}>
+          <div className="relative rounded-xl overflow-hidden" style={{ flex: '1 1 0', minHeight: '480px' }}>
             <MarsMap
               layers={layers}
               isEmergency={isEmergency}
@@ -248,39 +252,33 @@ export const App: React.FC = () => {
               onClearFocus={() => setFocusedCoordinates(null)}
             />
           </div>
-
-          {/* Layer Control Toggles Docked Under Map */}
           <LayerControls
             layers={layers}
-            onToggleLayer={handleToggleLayer}
+            onToggleLayer={(layerKey) => setLayers((previous) => ({
+              ...previous,
+              [layerKey]: !previous[layerKey]
+            }))}
           />
         </section>
 
-        {/* Right Tactical Sidebar (4 Columns on desktop) */}
         <aside className="lg:col-span-4 flex flex-col gap-3 overflow-y-auto pr-0.5">
-          {/* Emergency Contingency Action Box */}
           <EmergencyControl
             isEmergency={isEmergency}
             isRouting={isRouting}
             error={routingError}
             onToggleEmergency={handleToggleEmergency}
           />
-
-          {/* Suit Telemetry Indicators (Oxygen, Battery, Temp, Daylight) */}
-          <TelemetryHUD
-            telemetry={telemetry}
-            isEmergency={isEmergency}
-          />
-
-          {/* Route Explanation & Waypoint Profile */}
+          <TelemetryHUD telemetry={telemetry} isEmergency={isEmergency} />
           <RouteExplanation
             activeRoute={activeRoute}
+            routeCalculation={routeCalculation}
             isEmergency={isEmergency}
-            onSelectWaypoint={handleSelectWaypoint}
+            onSelectWaypoint={setFocusedCoordinates}
           />
         </aside>
       </main>
     </div>
   );
 };
+
 export default App;
