@@ -136,6 +136,8 @@ export const App: React.FC = () => {
   const [blockedHazardCells, setBlockedHazardCells] = useState<{ row: number; column: number }[] | null>(null);
 
   useEffect(() => {
+    let timeoutId: number | undefined;
+
     const requestNormalRoute = async () => {
       setIsRouting(true);
       setRoutingError(null);
@@ -152,14 +154,21 @@ export const App: React.FC = () => {
         if (!result.feasible) throw new Error(result.reason ?? 'No feasible outbound route.');
         setNormalRouteResult(result);
         setNormalRoute(routeResultToRouteData(result, 'normal'));
+        setRoutingError(null);
       } catch (error) {
         setRoutingError(error instanceof Error ? error.message : 'Python routing service is unavailable.');
+        // Auto-retry after 3 seconds if service is still starting up
+        timeoutId = window.setTimeout(requestNormalRoute, 3000);
       } finally {
         setIsRouting(false);
       }
     };
 
     void requestNormalRoute();
+
+    return () => {
+      if (timeoutId) window.clearTimeout(timeoutId);
+    };
   }, []);
 
   const handleToggleEmergency = async () => {
