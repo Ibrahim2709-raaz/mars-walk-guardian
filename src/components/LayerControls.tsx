@@ -1,0 +1,127 @@
+import React from 'react';
+import { Eye, Mountain, AlertOctagon, Sparkles, Layers } from 'lucide-react';
+import { LayerVisibility } from '../types';
+
+interface LayerControlsProps {
+  layers: LayerVisibility;
+  onToggleLayer: (layer: keyof LayerVisibility) => void;
+}
+
+export const LayerControls: React.FC<LayerControlsProps> = ({ layers, onToggleLayer }) => {
+  return (
+    <div className="tactical-panel rounded-xl p-3 border-orange-500/20 text-xs select-none">
+      <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
+        <span className="font-aerospace font-bold text-slate-200 tracking-wider flex items-center gap-1.5">
+          <Layers className="w-3.5 h-3.5 text-orange-400" /> TERRAIN LAYERS
+        </span>
+        <span className="text-[10px] font-mono text-slate-400">4 ACTIVE CHANNELS</span>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {/* Optical Toggle */}
+        <button
+          onClick={() => onToggleLayer('optical')}
+          className={`flex items-center justify-between p-2 rounded-lg border transition-all text-left cursor-pointer ${
+            layers.optical
+              ? 'bg-slate-900 border-orange-500/50 text-orange-300 shadow-sm shadow-orange-500/10'
+              : 'bg-slate-950/60 border-slate-800 text-slate-500 hover:border-slate-700'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <Eye className={`w-3.5 h-3.5 ${layers.optical ? 'text-orange-400' : 'text-slate-600'}`} />
+            <div>
+              <div className="font-aerospace font-semibold tracking-wide">OPTICAL</div>
+              <div className="text-[10px] font-mono text-slate-400">Mars Basemap</div>
+            </div>
+          </div>
+          <span className={`w-2 h-2 rounded-full ${layers.optical ? 'bg-orange-500 shadow-sm shadow-orange-500' : 'bg-slate-700'}`} />
+        </button>
+
+        {/* Slope Toggle */}
+        <button
+          onClick={() => onToggleLayer('slope')}
+          className={`flex items-center justify-between p-2 rounded-lg border transition-all text-left cursor-pointer ${
+            layers.slope
+              ? 'bg-slate-900 border-emerald-500/50 text-emerald-300 shadow-sm shadow-emerald-500/10'
+              : 'bg-slate-950/60 border-slate-800 text-slate-500 hover:border-slate-700'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <Mountain className={`w-3.5 h-3.5 ${layers.slope ? 'text-emerald-400' : 'text-slate-600'}`} />
+            <div>
+              <div className="font-aerospace font-semibold tracking-wide">SLOPE</div>
+              <div className="text-[10px] font-mono text-slate-400">&lt;10° to &gt;25°</div>
+            </div>
+          </div>
+          <span className={`w-2 h-2 rounded-full ${layers.slope ? 'bg-emerald-500 shadow-sm shadow-emerald-500' : 'bg-slate-700'}`} />
+        </button>
+
+        {/* Hazard Toggle */}
+        <button
+          onClick={() => onToggleLayer('hazard')}
+          className={`flex items-center justify-between p-2 rounded-lg border transition-all text-left cursor-pointer ${
+            layers.hazard
+              ? 'bg-slate-900 border-red-500/50 text-red-300 shadow-sm shadow-red-500/10'
+              : 'bg-slate-950/60 border-slate-800 text-slate-500 hover:border-slate-700'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <AlertOctagon className={`w-3.5 h-3.5 ${layers.hazard ? 'text-red-400' : 'text-slate-600'}`} />
+            <div>
+              <div className="font-aerospace font-semibold tracking-wide">HAZARDS</div>
+              <div className="text-[10px] font-mono text-slate-400">Dunes &amp; Clasts</div>
+            </div>
+          </div>
+          <span className={`w-2 h-2 rounded-full ${layers.hazard ? 'bg-red-500 shadow-sm shadow-red-500' : 'bg-slate-700'}`} />
+        </button>
+
+        {/* Mineral Toggle */}
+        <button
+          onClick={() => onToggleLayer('mineral')}
+          className={`flex items-center justify-between p-2 rounded-lg border transition-all text-left cursor-pointer ${
+            layers.mineral
+              ? 'bg-slate-900 border-purple-500/50 text-purple-300 shadow-sm shadow-purple-500/10'
+              : 'bg-slate-950/60 border-slate-800 text-slate-500 hover:border-slate-700'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <Sparkles className={`w-3.5 h-3.5 ${layers.mineral ? 'text-purple-400' : 'text-slate-600'}`} />
+            <div>
+              <div className="font-aerospace font-semibold tracking-wide">MINERALS</div>
+              <div className="text-[10px] font-mono text-slate-400">CRISM Spectro</div>
+            </div>
+          </div>
+          <span className={`w-2 h-2 rounded-full ${layers.mineral ? 'bg-purple-500 shadow-sm shadow-purple-500' : 'bg-slate-700'}`} />
+        </button>
+      </div>
+
+      {/* Layer Color Key / Mini Legend */}
+      {(layers.slope || layers.hazard || layers.mineral) && (
+        <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex flex-wrap items-center gap-3 text-[10px] font-mono text-slate-400">
+          {layers.slope && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-500">Slope:</span>
+              <span className="inline-block w-2 h-2 rounded-sm bg-emerald-500/70" /> <span>Safe (&lt;10°)</span>
+              <span className="inline-block w-2 h-2 rounded-sm bg-amber-500/70" /> <span>Moderate</span>
+              <span className="inline-block w-2 h-2 rounded-sm bg-red-600/70" /> <span>Scarp (&gt;25°)</span>
+            </div>
+          )}
+          {layers.hazard && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-500">Hazards:</span>
+              <span className="inline-block w-2 h-2 rounded-sm bg-rose-600/60 border border-rose-500" /> <span>Slip Dunes / Clasts</span>
+            </div>
+          )}
+          {layers.mineral && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-500">Minerals:</span>
+              <span className="inline-block w-2 h-2 rounded-sm bg-cyan-400/60" /> <span>Sulfates</span>
+              <span className="inline-block w-2 h-2 rounded-sm bg-yellow-400/60" /> <span>Clays</span>
+              <span className="inline-block w-2 h-2 rounded-sm bg-purple-500/60" /> <span>Hematite</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
