@@ -1,271 +1,306 @@
-import { RouteData, ScienceMarker, LatLng } from '../types';
+﻿import { RouteData, ScienceMarker, LatLng, TerrainGrid } from '../types';
 
-export const GALE_BASE_COORDINATES: LatLng = [137.419, -4.842];
-export const BOXWORK_TARGET_COORDINATES: LatLng = [137.382, -4.892];
-export const CURRENT_ASTRONAUT_COORDINATES: LatLng = [137.396, -4.879];
+export const GALE_BASE_COORDINATES: LatLng = [137.41900, -4.84200];
+export const BOXWORK_TARGET_COORDINATES: LatLng = [137.42010, -4.84295];
+export const CURRENT_ROVER_COORDINATES: LatLng = [137.41952, -4.84235];
+
+export const MOCK_TERRAIN_GRID: TerrainGrid = {
+  id: 'gale-simulated-dem-grid-v1',
+  resolutionM: 1.0,
+  rows: 100,
+  cols: 100,
+  bounds: {
+    minLng: 137.4185,
+    maxLng: 137.4205,
+    minLat: -4.8435,
+    maxLat: -4.8415
+  },
+  isSimulated: true
+};
 
 export const GALE_BASE_MARKER: ScienceMarker = {
-  id: 'gale-base',
-  name: 'Gale Base Alpha (SIMULATED)',
+  id: 'gale-rover-base',
+  name: 'Gale Rover Base — Simulated Operations Point',
   coordinates: GALE_BASE_COORDINATES,
   category: 'base',
   elevation: -4420,
-  label: 'SIMULATED Gale Base Alpha',
+  label: '[SIMULATED] Gale Rover Base — Simulated Operations Point',
   isSimulated: true,
-  geologicalSignificance: 'Primary pressurized habitat & rover garage situated on the flat, consolidated plains of Aeolis Palus.'
+  provenance: 'SIMULATED MOCK DATA',
+  geologicalSignificance: 'Simulated robotic operations center, docking berth, and recharge station situated on the consolidated sedimentary plains of Aeolis Palus.'
 };
 
 export const BOXWORK_TARGET_MARKER: ScienceMarker = {
   id: 'boxwork-target',
-  name: 'Mount Sharp Boxwork Target Alpha',
+  name: 'Mount Sharp Boxwork Science Target Alpha',
   coordinates: BOXWORK_TARGET_COORDINATES,
   category: 'boxwork_target',
-  elevation: -4090,
+  elevation: -4416.9,
   label: 'Boxwork Mineralized Ridge Target',
   isSimulated: false,
-  geologicalSignificance: 'Curiosity-observed 3D web-like boxwork ridges formed by mineral-rich groundwater filling subsurface bedrock fractures, subsequently exposed by billions of years of wind erosion.'
+  provenance: 'NASA-DERIVED',
+  geologicalSignificance: 'NASA Curiosity rover discovery: Web-like polygonal ridges formed by ancient mineral-rich groundwater filling subsurface bedrock fractures, exposed after billions of years of wind erosion.'
+};
+
+export const ROVER_MARKER: ScienceMarker = {
+  id: 'aer-1-rover',
+  name: 'Autonomous Exploration Rover (AER-1)',
+  coordinates: CURRENT_ROVER_COORDINATES,
+  category: 'rover',
+  elevation: -4418.6,
+  label: 'AER-1 Robotic Rover (Current Station)',
+  isSimulated: true,
+  provenance: 'SYSTEM-DERIVED',
+  geologicalSignificance: 'Robotic exploration rover currently stationed on Bedrock Saddle (Station 2) undergoing wheel-slip check and telemetry uplink.'
 };
 
 export const NORMAL_ROUTE: RouteData = {
   id: 'route-normal',
-  name: 'Planned Scientific Traverse (Gale Base -> Boxwork)',
+  name: 'Planned Scientific Traverse (Gale Rover Base -> Boxwork Target)',
   type: 'normal',
   color: '#00e5ff',
-  distanceKm: 4.85,
-  estimatedMinutes: 95,
-  elevationGainMeters: 330,
-  maxSlopeDeg: 14.5,
+  distanceM: 86.3,
+  estimatedMinutes: 38,
+  elevationGainMeters: 3.1,
+  maxSlopeDeg: 8.5,
   status: 'active',
-  rationale: 'Primary scientific route designed to sample the Vera Rubin Ridge hematite transition while keeping suit energy expenditure within nominal margins. Traverse avoids steep sand dunes and prioritizes firm sedimentary bedrock.',
+  provenance: 'SYSTEM-DERIVED',
+  rationale: 'Primary robotic traverse vector (86.3 m). Directs rover across consolidated alluvial hardpan and stable basalt bedrock to reach the Boxwork fracture ridges while maintaining low wheel-slip (<5%) and safe energy consumption margins.',
   coordinates: [
-    [137.419, -4.842], // Gale Base
-    [137.414, -4.849], // Peace Vallis Alluvial Fan
-    [137.409, -4.858], // Duna Low Gap
-    [137.403, -4.869], // Bagnold Inter-Dune Transit
-    [137.396, -4.879], // Vera Rubin Ridge Saddle (Current Astronaut Position)
-    [137.389, -4.887], // Gediz Vallis Channel Margin
-    [137.382, -4.892]  // Boxwork Target Alpha
+    [137.41900, -4.84200], // Gale Rover Base Berth 1
+    [137.41925, -4.84218], // Outwash Hardpan (Station 1)
+    [137.41952, -4.84235], // Bedrock Saddle (Station 2 - Rover Position)
+    [137.41978, -4.84262], // Sand Drift Margin (Station 3)
+    [137.42010, -4.84295]  // Boxwork Science Target (Station 4)
   ],
   waypoints: [
     {
       id: 'wp-0',
-      name: 'Gale Base Airlock-1 (SIMULATED)',
-      coordinates: [137.419, -4.842],
-      elevationMeters: -4420,
-      slopeGradeDeg: 1.2,
-      terrainType: 'Compacted Regolith / Concrete Apron',
+      name: 'Gale Rover Base — Simulated Operations Point (Berth 1)',
+      coordinates: [137.41900, -4.84200],
+      elevationMeters: -4420.0,
+      slopeGradeDeg: 0.8,
+      terrainType: 'Compacted Regolith Apron',
       hazardLevel: 'LOW',
-      description: 'Departure staging bay with direct high-gain comms to Mars Reconnaissance Orbiter.'
+      description: 'Operations departure berth with high-gain uplink to Mars Reconnaissance Orbiter and battery recharge coupling.'
     },
     {
       id: 'wp-1',
-      name: 'Peace Vallis Outwash Apron',
-      coordinates: [137.414, -4.849],
-      elevationMeters: -4385,
-      slopeGradeDeg: 4.5,
-      terrainType: 'Conglomerate Sandstone Pavement',
+      name: 'Local Outwash Hardpan (Station 1)',
+      coordinates: [137.41925, -4.84218],
+      elevationMeters: -4419.4,
+      slopeGradeDeg: 2.1,
+      terrainType: 'Consolidated Pebble Pavement',
       hazardLevel: 'LOW',
-      description: 'Ancient fluvial fan with gravel-sized rounded pebbles, excellent wheel and boot traction.'
+      description: 'Ancient fluvial conglomerate fan with rounded pebbles. Excellent 6-wheel traction with near-zero sinkage.'
     },
     {
       id: 'wp-2',
-      name: 'Bagnold Dunes North Corridor',
-      coordinates: [137.409, -4.858],
-      elevationMeters: -4330,
-      slopeGradeDeg: 8.2,
-      terrainType: 'Inter-Dune Basalt Hardpan',
-      hazardLevel: 'MEDIUM',
-      description: 'Narrow transit lane between active dark basalt dunes. Stay on bedrock corridor to prevent sinkage.'
+      name: 'Bedrock Saddle (Station 2 — Rover Current Position)',
+      coordinates: [137.41952, -4.84235],
+      elevationMeters: -4418.6,
+      slopeGradeDeg: 3.8,
+      terrainType: 'Resistant Basalt Siltstone',
+      hazardLevel: 'LOW',
+      description: 'Intermediate structural bench. Rover telemetry check station and mast camera forward hazard scan.'
     },
     {
       id: 'wp-3',
-      name: 'Vera Rubin Ridge Saddle',
-      coordinates: [137.396, -4.879],
-      elevationMeters: -4210,
-      slopeGradeDeg: 12.0,
-      terrainType: 'Hematite-Rich Resistant Bedrock',
-      hazardLevel: 'LOW',
-      description: 'Prominent structural ledge with elevated iron oxide signatures and high scenic visibility.'
+      name: 'Sand Drift Bypass Margin (Station 3)',
+      coordinates: [137.41978, -4.84262],
+      elevationMeters: -4417.8,
+      slopeGradeDeg: 4.2,
+      terrainType: 'Firm Inter-Ripple Bedrock',
+      hazardLevel: 'MEDIUM',
+      description: 'Navigates along firm bedrock perimeter to bypass active loose ripple slipfaces and minimize wheel slip.'
     },
     {
       id: 'wp-4',
-      name: 'Gediz Vallis Gully Flank',
-      coordinates: [137.389, -4.887],
-      elevationMeters: -4145,
-      slopeGradeDeg: 14.5,
-      terrainType: 'Debris Flow Boulder Conglomerate',
-      hazardLevel: 'MEDIUM',
-      description: 'Boulder-strewn slope deposited by ancient water-lubricated slurry debris flows.'
-    },
-    {
-      id: 'wp-5',
-      name: 'Boxwork Science Target Alpha',
-      coordinates: [137.382, -4.892],
-      elevationMeters: -4090,
-      slopeGradeDeg: 7.8,
-      terrainType: 'Mineralized Fractured Grid Blades',
+      name: 'Mount Sharp Boxwork Science Target Alpha (Station 4)',
+      coordinates: [137.42010, -4.84295],
+      elevationMeters: -4416.9,
+      slopeGradeDeg: 2.5,
+      terrainType: 'Mineralized Boxwork Fracture Blades',
       hazardLevel: 'LOW',
-      description: 'Primary sampling objective. Polished boxwork ridges protruding up to 1-2 meters above surrounding siltstone.'
+      description: 'Primary robotic science sampling target. Polygonal blades protruding 0.5-1.5m above eroded bedrock.'
     }
   ]
 };
 
 export const EMERGENCY_ROUTE: RouteData = {
   id: 'route-emergency',
-  name: 'Rapid Evacuation Vector (Direct Hardpan Egress)',
+  name: 'Contingency Return Vector (Direct Hardpan Egress)',
   type: 'emergency',
   color: '#ef4444',
-  distanceKm: 3.92,
-  estimatedMinutes: 44,
-  elevationGainMeters: -210, // Downhill descent back to base
-  maxSlopeDeg: 8.8,
+  distanceM: 79.4,
+  estimatedMinutes: 26,
+  elevationGainMeters: -3.1, // Downhill return to base
+  maxSlopeDeg: 6.2,
   status: 'standby',
-  rationale: 'High-speed emergency egress corridor. Bypasses the rocky Vera Rubin ridge climb and deep dune fields, guiding the astronaut along a downhill hardpan basalt freeway with continuous 100% Line-of-Sight telemetry to Gale Base.',
+  provenance: 'SYSTEM-DERIVED',
+  rationale: 'Contingency recovery corridor (79.4 m). Hard-coded mock return vector that steers rover along high-traction bedrock directly back to Gale Rover Base Berth 1, bypassing loose drift zones to protect drive actuators.',
   coordinates: [
-    [137.396, -4.879], // Current EVA position (or Boxwork Target)
-    [137.401, -4.867], // Hardpan Basalt Run
-    [137.411, -4.853], // Alluvial Low-Slope Chute
-    [137.419, -4.842]  // Gale Base Airlock-1
+    [137.42010, -4.84295], // Contingency Abort Origin (Near Boxwork Site)
+    [137.41970, -4.84258], // Firm Hardpan Egress Spine
+    [137.41932, -4.84226], // Operations Base Approach Vector
+    [137.41900, -4.84200]  // Gale Rover Base Berth 1
   ],
   waypoints: [
     {
       id: 'ewp-0',
-      name: 'EVA Position Vector',
-      coordinates: [137.396, -4.879],
-      elevationMeters: -4210,
-      slopeGradeDeg: 8.8,
-      terrainType: 'Descent Ridge Flank',
+      name: 'Contingency Abort Origin (Near Boxwork Site)',
+      coordinates: [137.42010, -4.84295],
+      elevationMeters: -4416.9,
+      slopeGradeDeg: 2.5,
+      terrainType: 'Fractured Bedrock Rim',
       hazardLevel: 'LOW',
-      description: 'Initiation of emergency retreat protocol. Abort all sample extraction.'
+      description: 'Station where contingency abort was initiated. Rover re-orients toward Gale Rover Base heading 315°.'
     },
     {
       id: 'ewp-1',
-      name: 'Basalt Hardpan Evacuation Corridor',
-      coordinates: [137.401, -4.867],
-      elevationMeters: -4295,
-      slopeGradeDeg: 6.2,
-      terrainType: 'Flat Basalt Bedrock',
+      name: 'Firm Hardpan Egress Spine',
+      coordinates: [137.41970, -4.84258],
+      elevationMeters: -4417.9,
+      slopeGradeDeg: 3.1,
+      terrainType: 'Exposed Hardpan Pavement',
       hazardLevel: 'LOW',
-      description: 'Optimal surface for sustained high-speed stride (up to 5.4 km/h in low gravity).'
+      description: 'High-traction spine bypassing all sand ripple hazards for maximum rover stability.'
     },
     {
       id: 'ewp-2',
-      name: 'Gale Base Approach Chute',
-      coordinates: [137.411, -4.853],
-      elevationMeters: -4375,
-      slopeGradeDeg: 3.1,
-      terrainType: 'Alluvial Flat Regolith',
+      name: 'Operations Base Approach Vector',
+      coordinates: [137.41932, -4.84226],
+      elevationMeters: -4419.1,
+      slopeGradeDeg: 1.8,
+      terrainType: 'Level Regolith Corridor',
       hazardLevel: 'LOW',
-      description: 'Direct optical contact with Gale Base high-intensity beacon.'
+      description: 'Direct visual and UHF line-of-sight to Gale Rover Base docking beacon.'
     },
     {
       id: 'ewp-3',
-      name: 'Gale Base Airlock-1 (SIMULATED)',
-      coordinates: [137.419, -4.842],
-      elevationMeters: -4420,
+      name: 'Gale Rover Base — Simulated Operations Point (Berth 1)',
+      coordinates: [137.41900, -4.84200],
+      elevationMeters: -4420.0,
       slopeGradeDeg: 0.5,
-      terrainType: 'Pressurized Ingress Pad',
+      terrainType: 'Docking & Recharge Pad',
       hazardLevel: 'LOW',
-      description: 'Safe haven ingress reached. Automatic suit repressurization & medical triage.'
+      description: 'Safe recovery berth reached. Wheel drive motors locked, automated diagnostic & recharge cycle initiated.'
     }
   ]
 };
 
-// Slope Heatmap GeoJSON (Safe green, moderate yellow, steep red)
+// Slope Heatmap GeoJSON (Simulated Mock Data)
 export const SLOPES_GEOJSON: GeoJSON.FeatureCollection = {
   type: 'FeatureCollection',
   features: [
     {
       type: 'Feature',
-      properties: { grade: 'steep', slopeDeg: 28, label: 'Mount Sharp Upper Scarp (>25° - HAZARDOUS)' },
+      properties: {
+        provenance: 'SIMULATED MOCK DATA',
+        grade: 'steep',
+        slopeDeg: 18.5,
+        label: 'Simulated Slope Gradient (Mock Data): Rim Incline (>15° — HAZARDOUS)'
+      },
       geometry: {
         type: 'Polygon',
         coordinates: [[
-          [137.370, -4.898],
-          [137.388, -4.908],
-          [137.375, -4.918],
-          [137.360, -4.905],
-          [137.370, -4.898]
+          [137.42020, -4.84310],
+          [137.42070, -4.84315],
+          [137.42065, -4.84350],
+          [137.42015, -4.84345],
+          [137.42020, -4.84310]
         ]]
       }
     },
     {
       type: 'Feature',
-      properties: { grade: 'moderate', slopeDeg: 16, label: 'Vera Rubin Ridge Flank (10-20° - CAUTION)' },
+      properties: {
+        provenance: 'SIMULATED MOCK DATA',
+        grade: 'moderate',
+        slopeDeg: 8.5,
+        label: 'Simulated Slope Gradient (Mock Data): Ridge Transition (5-15° — CAUTION)'
+      },
       geometry: {
         type: 'Polygon',
         coordinates: [[
-          [137.385, -4.872],
-          [137.402, -4.882],
-          [137.398, -4.890],
-          [137.380, -4.880],
-          [137.385, -4.872]
+          [137.41960, -4.84230],
+          [137.42020, -4.84250],
+          [137.42005, -4.84285],
+          [137.41945, -4.84265],
+          [137.41960, -4.84230]
         ]]
       }
     },
     {
       type: 'Feature',
-      properties: { grade: 'gentle', slopeDeg: 4, label: 'Aeolis Palus Plains (<8° - SAFE)' },
+      properties: {
+        provenance: 'SIMULATED MOCK DATA',
+        grade: 'gentle',
+        slopeDeg: 1.8,
+        label: 'Simulated Slope Gradient (Mock Data): Operations Plain (<5° — SAFE)'
+      },
       geometry: {
         type: 'Polygon',
         coordinates: [[
-          [137.405, -4.835],
-          [137.430, -4.835],
-          [137.430, -4.858],
-          [137.405, -4.858],
-          [137.405, -4.835]
+          [137.41870, -4.84170],
+          [137.41960, -4.84180],
+          [137.41950, -4.84230],
+          [137.41860, -4.84220],
+          [137.41870, -4.84170]
         ]]
       }
     }
   ]
 };
 
-// Hazard Zones GeoJSON
+// Hazard Zones GeoJSON (Simulated Mock Data)
 export const HAZARDS_GEOJSON: GeoJSON.FeatureCollection = {
   type: 'FeatureCollection',
   features: [
     {
       type: 'Feature',
       properties: {
-        id: 'hazard-bagnold',
-        type: 'Unconsolidated Sand Dunes',
+        id: 'hazard-loose-sand',
+        provenance: 'SIMULATED MOCK DATA',
+        type: 'Loose Sand Ripple Corridor',
         severity: 'HIGH_SLIP',
-        warning: 'Bagnold Dunes active slipface. High risk of astronaut or rover wheel entrapment. Traversal prohibited.'
+        warning: '[SIMULATED MOCK DATA] Active sand ripple field with low shear strength. High wheel-slip risk (>30%) for robotic rover chassis. Traverse routing avoids this zone.'
       },
       geometry: {
         type: 'Polygon',
         coordinates: [[
-          [137.402, -4.856],
-          [137.410, -4.862],
-          [137.405, -4.872],
-          [137.397, -4.865],
-          [137.402, -4.856]
+          [137.41955, -4.84205],
+          [137.41985, -4.84215],
+          [137.41975, -4.84242],
+          [137.41945, -4.84232],
+          [137.41955, -4.84205]
         ]]
       }
     },
     {
       type: 'Feature',
       properties: {
-        id: 'hazard-boulder',
-        type: 'Dense Boulder Field (>18/m²)',
+        id: 'hazard-boulder-field',
+        provenance: 'SIMULATED MOCK DATA',
+        type: 'Dense Basalt Boulder Outcrop',
         severity: 'OBSTACLE_DENSITY',
-        warning: 'Gediz Vallis debris fall. Sharp basalt clasts with risk of suit puncture and tripping.'
+        warning: '[SIMULATED MOCK DATA] Clast density >15 boulders/m². Chassis clearance hazard and wheel puncture risk. Direct rover transit prohibited.'
       },
       geometry: {
         type: 'Polygon',
         coordinates: [[
-          [137.377, -4.884],
-          [137.386, -4.880],
-          [137.391, -4.889],
-          [137.381, -4.895],
-          [137.377, -4.884]
+          [137.41915, -4.84235],
+          [137.41945, -4.84242],
+          [137.41938, -4.84270],
+          [137.41908, -4.84262],
+          [137.41915, -4.84235]
         ]]
       }
     }
   ]
 };
 
-// Minerals Layer GeoJSON (CRISM Spectrometer data)
+// Minerals Layer GeoJSON (Simulated Mock Data)
 export const MINERALS_GEOJSON: GeoJSON.FeatureCollection = {
   type: 'FeatureCollection',
   features: [
@@ -273,19 +308,20 @@ export const MINERALS_GEOJSON: GeoJSON.FeatureCollection = {
       type: 'Feature',
       properties: {
         id: 'min-sulfates',
+        provenance: 'SIMULATED MOCK DATA',
         mineral: 'Hydrated Magnesium & Polyhydrated Sulfates',
         color: '#06b6d4', // Cyan
-        deposit: 'Mount Sharp Sulfate Unit',
-        description: 'Deposited during Mars drying epoch, rich in ancient evaporite salts.'
+        deposit: 'Mount Sharp Sulfate Unit (Mock Data)',
+        description: '[SIMULATED MOCK DATA] Simulated CRISM spectral signature: Hydrated evaporite salts indicative of Mars transition into drying arid epoch.'
       },
       geometry: {
         type: 'Polygon',
         coordinates: [[
-          [137.372, -4.882],
-          [137.392, -4.888],
-          [137.387, -4.902],
-          [137.368, -4.896],
-          [137.372, -4.882]
+          [137.41990, -4.84275],
+          [137.42035, -4.84280],
+          [137.42030, -4.84315],
+          [137.41985, -4.84310],
+          [137.41990, -4.84275]
         ]]
       }
     },
@@ -293,19 +329,20 @@ export const MINERALS_GEOJSON: GeoJSON.FeatureCollection = {
       type: 'Feature',
       properties: {
         id: 'min-clays',
+        provenance: 'SIMULATED MOCK DATA',
         mineral: 'Phyllosilicates (Smectite Clay)',
         color: '#eab308', // Gold/Yellow
-        deposit: 'Glen Torridon Clay Unit',
-        description: 'Formed in neutral-pH, habitable water bodies inside early Gale Lake.'
+        deposit: 'Glen Torridon Clay Unit (Mock Data)',
+        description: '[SIMULATED MOCK DATA] Simulated CRISM spectral signature: Smectite clays formed in neutral-pH, ancient aqueous lacustrine conditions.'
       },
       geometry: {
         type: 'Polygon',
         coordinates: [[
-          [137.395, -4.850],
-          [137.420, -4.855],
-          [137.412, -4.870],
-          [137.390, -4.865],
-          [137.395, -4.850]
+          [137.41865, -4.84175],
+          [137.41915, -4.84180],
+          [137.41910, -4.84215],
+          [137.41860, -4.84210],
+          [137.41865, -4.84175]
         ]]
       }
     },
@@ -313,19 +350,20 @@ export const MINERALS_GEOJSON: GeoJSON.FeatureCollection = {
       type: 'Feature',
       properties: {
         id: 'min-hematite',
+        provenance: 'SIMULATED MOCK DATA',
         mineral: 'Crystalline Gray Hematite',
         color: '#a855f7', // Purple
-        deposit: 'Vera Rubin Ridge',
-        description: 'High-density iron oxide precipitate from groundwater plumes meeting oxidized surface waters.'
+        deposit: 'Vera Rubin Ridge Iron Ridge (Mock Data)',
+        description: '[SIMULATED MOCK DATA] Simulated CRISM spectral signature: High-density iron oxide precipitate from oxidized groundwater plumes.'
       },
       geometry: {
         type: 'Polygon',
         coordinates: [[
-          [137.390, -4.872],
-          [137.408, -4.876],
-          [137.405, -4.886],
-          [137.386, -4.882],
-          [137.390, -4.872]
+          [137.41935, -4.84215],
+          [137.41970, -4.84222],
+          [137.41965, -4.84250],
+          [137.41930, -4.84242],
+          [137.41935, -4.84215]
         ]]
       }
     }
