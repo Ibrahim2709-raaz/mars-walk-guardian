@@ -8,8 +8,10 @@ import {
   NavigationControl,
   Popup,
   ScaleControl,
-  StyleSpecification
+  StyleSpecification,
+  setWorkerUrl
 } from 'maplibre-gl';
+import mapLibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import {
   BOXWORK_TARGET_COORDINATES,
@@ -21,6 +23,10 @@ import {
 } from '../data/marsGeoData';
 import { cellToLngLat } from '../data/terrainSites';
 import { LatLng, LayerVisibility, RouteData } from '../types';
+
+// Vite's default blob worker is blocked in embedded browser contexts. Point
+// MapLibre at its packaged module worker so GeoJSON route layers render there.
+setWorkerUrl(mapLibreWorkerUrl);
 
 interface MarsMapProps {
   layers: LayerVisibility;
