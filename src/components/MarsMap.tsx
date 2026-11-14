@@ -278,15 +278,16 @@ export const MarsMap: React.FC<MarsMapProps> = ({
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const update = () => {
-      (map.getSource('route-normal-source') as GeoJSONSource | undefined)
-        ?.setData(routeFeature(normalRoute, GALE_BASE_COORDINATES));
-      (map.getSource('route-emergency-source') as GeoJSONSource | undefined)
-        ?.setData(routeFeature(emergencyRoute, BOXWORK_TARGET_COORDINATES));
-
+    const update = (): boolean => {
+      const normalSource = map.getSource('route-normal-source') as GeoJSONSource | undefined;
+      const emergencySource = map.getSource('route-emergency-source') as GeoJSONSource | undefined;
       const hazardSource = map.getSource('blocked-hazard-source') as GeoJSONSource | undefined;
-      if (hazardSource) {
-        if (isEmergency && blockedHazardCells && blockedHazardCells.length > 0) {
+      if (!normalSource || !emergencySource || !hazardSource) return false;
+
+      normalSource.setData(routeFeature(normalRoute, GALE_BASE_COORDINATES));
+      emergencySource.setData(routeFeature(emergencyRoute, BOXWORK_TARGET_COORDINATES));
+
+      if (isEmergency && blockedHazardCells && blockedHazardCells.length > 0) {
           // Bounding box of blocked cells
           let minRow = Infinity, maxRow = -Infinity, minCol = Infinity, maxCol = -Infinity;
           for (const cell of blockedHazardCells) {
@@ -301,51 +302,82 @@ export const MarsMap: React.FC<MarsMapProps> = ({
           const se = cellToLngLat(maxRow + 1, maxCol + 1);
           const sw = cellToLngLat(maxRow + 1, minCol);
 
-          hazardSource.setData({
-            type: 'FeatureCollection',
-            features: [
-              {
-                type: 'Feature',
-                properties: {
-                  type: 'Simulated Emergency Hazard Zone',
-                  warning: 'Simulated obstacle grid (rows 62–72, cols 115–135) forcing contingency detour.'
-                },
-                geometry: {
-                  type: 'Polygon',
-                  coordinates: [[nw, ne, se, sw, nw]]
-                }
+        hazardSource.setData({
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {
+                type: 'Simulated Emergency Hazard Zone',
+                warning: 'Simulated obstacle grid (rows 62–72, cols 115–135) forcing contingency detour.'
+              },
+              geometry: {
+                type: 'Polygon',
+                coordinates: [[nw, ne, se, sw, nw]]
               }
-            ]
-          });
-        } else {
-          hazardSource.setData({
-            type: 'FeatureCollection',
-            features: []
-          });
-        }
+            }
+          ]
+        });
+      } else {
+        hazardSource.setData({
+          type: 'FeatureCollection',
+          features: []
+        });
+      }
+      return true;
+    };
+
+    const updateWhenReady = () => {
+      if (update()) {
+        map.off('load', updateWhenReady);
+        map.off('styledata', updateWhenReady);
       }
     };
-    if (map.isStyleLoaded()) update();
-    else map.once('load', update);
+    if (!update()) {
+      map.on('load', updateWhenReady);
+      map.on('styledata', updateWhenReady);
+    }
+    return () => {
+      map.off('load', updateWhenReady);
+      map.off('styledata', updateWhenReady);
+    };
   }, [normalRoute, emergencyRoute, isEmergency, blockedHazardCells]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-    const setVisibility = (ids: string[], visible: boolean) => ids.forEach((id) => {
-      if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');
-    });
-    setVisibility(['mars-raster-layer'], layers.optical);
-    setVisibility(['slopes-fill', 'slopes-line'], layers.slope);
-    setVisibility(['hazards-fill', 'hazards-outline'], layers.hazard);
-    setVisibility(['minerals-fill', 'minerals-outline'], layers.mineral);
+    if (!map) return;
+    const updateVisibility = (): boolean => {
+      if (!map.getLayer('mars-raster-layer') || !map.getLayer('slopes-fill')) return false;
+      const setVisibility = (ids: string[], visible: boolean) => ids.forEach((id) => {
+        if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');
+      });
+      setVisibility(['mars-raster-layer'], layers.optical);
+      setVisibility(['slopes-fill', 'slopes-line'], layers.slope);
+      setVisibility(['hazards-fill', 'hazards-outline'], layers.hazard);
+      setVisibility(['minerals-fill', 'minerals-outline'], layers.mineral);
+      return true;
+    };
+    const updateWhenReady = () => {
+      if (updateVisibility()) {
+        map.off('load', updateWhenReady);
+        map.off('styledata', updateWhenReady);
+      }
+    };
+    if (!updateVisibility()) {
+      map.on('load', updateWhenReady);
+      map.on('styledata', updateWhenReady);
+    }
+    return () => {
+      map.off('load', updateWhenReady);
+      map.off('styledata', updateWhenReady);
+    };
   }, [layers]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const update = () => {
-      if (!map.getLayer('route-normal-core')) return;
+    const update = (): boolean => {
+      if (!map.getLayer('route-normal-core') || !map.getLayer('route-emergency-core')) return false;
       map.setPaintProperty('route-normal-glow', 'line-opacity', isEmergency ? 0.15 : 0.5);
       map.setPaintProperty('route-normal-core', 'line-opacity', isEmergency ? 0.3 : 0.95);
       map.setPaintProperty('route-emergency-glow', 'line-opacity', isEmergency ? 0.8 : 0.2);
@@ -361,9 +393,23 @@ export const MarsMap: React.FC<MarsMapProps> = ({
         );
         map.fitBounds(bounds, { padding: 120, maxZoom: 18.4, duration: 900 });
       }
+      return true;
     };
-    if (map.isStyleLoaded()) update();
-    else map.once('load', update);
+
+    const updateWhenReady = () => {
+      if (update()) {
+        map.off('load', updateWhenReady);
+        map.off('styledata', updateWhenReady);
+      }
+    };
+    if (!update()) {
+      map.on('load', updateWhenReady);
+      map.on('styledata', updateWhenReady);
+    }
+    return () => {
+      map.off('load', updateWhenReady);
+      map.off('styledata', updateWhenReady);
+    };
   }, [isEmergency, normalRoute, emergencyRoute]);
 
   useEffect(() => {
