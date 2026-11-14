@@ -133,6 +133,7 @@ export const App: React.FC = () => {
   const [emergencyRouteResult, setEmergencyRouteResult] = useState<RouteResult | null>(null);
   const [isRouting, setIsRouting] = useState(true);
   const [routingError, setRoutingError] = useState<string | null>(null);
+  const [blockedHazardCells, setBlockedHazardCells] = useState<{ row: number; column: number }[] | null>(null);
 
   useEffect(() => {
     const requestNormalRoute = async () => {
@@ -166,6 +167,7 @@ export const App: React.FC = () => {
       setIsEmergency(false);
       setTelemetry(NOMINAL_ROVER_TELEMETRY);
       setRoutingError(null);
+      setBlockedHazardCells(null);
       return;
     }
     if (!normalRouteResult) {
@@ -176,7 +178,14 @@ export const App: React.FC = () => {
     setIsRouting(true);
     setRoutingError(null);
     try {
-      const rerouteCell = normalRouteResult.path[Math.floor(normalRouteResult.path.length / 2)];
+      // Generate a rectangular simulated hazard zone: rows 62–72, columns 115–135
+      const blockedCells: { row: number; column: number }[] = [];
+      for (let row = 62; row <= 72; row++) {
+        for (let col = 115; col <= 135; col++) {
+          blockedCells.push({ row, column: col });
+        }
+      }
+
       const result = await calculateTerrainRoute({
         start: SCIENCE_TARGET_POSITION,
         target: BASE_POSITION,
@@ -185,11 +194,12 @@ export const App: React.FC = () => {
           battery_reserve_wh: 10,
           energy_per_meter_wh: 0.25
         },
-        blocked_cells: rerouteCell ? [{ row: rerouteCell.row, column: rerouteCell.column }] : []
+        blocked_cells: blockedCells
       });
       if (!result.feasible) throw new Error(result.reason ?? 'No feasible emergency return route.');
       setEmergencyRouteResult(result);
       setEmergencyRoute(routeResultToRouteData(result, 'emergency'));
+      setBlockedHazardCells(blockedCells);
       setIsEmergency(true);
       setTelemetry(EMERGENCY_ROVER_TELEMETRY);
     } catch (error) {
@@ -248,6 +258,7 @@ export const App: React.FC = () => {
               isEmergency={isEmergency}
               normalRoute={normalRoute}
               emergencyRoute={emergencyRoute}
+              blockedHazardCells={blockedHazardCells}
               focusedCoordinates={focusedCoordinates}
               onClearFocus={() => setFocusedCoordinates(null)}
             />

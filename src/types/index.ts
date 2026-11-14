@@ -79,7 +79,7 @@ export interface ScienceMarker {
   id: string;
   name: string;
   coordinates: LatLng;
-  category: 'base' | 'boxwork_target' | 'hazard' | 'rover';
+  category: 'base' | 'science_target_candidate' | 'hazard' | 'rover';
   elevation: number;
   label: string;
   isSimulated: boolean;
