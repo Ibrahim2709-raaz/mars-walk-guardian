@@ -48,8 +48,8 @@ export const EmergencyControl: React.FC<EmergencyControlProps> = ({
             </div>
             <p className="text-xs text-slate-400 font-mono mt-0.5 max-w-xl">
               {isEmergency
-                ? 'Python weighted A* calculated a feasible return route around the injected blocked cell.'
-                : 'Inject a blocked-path fault and request a live return route from the Python service.'}
+                ? 'Python weighted A* calculated a feasible return route around the simulated hazard zone (rows 62–72, cols 115–135).'
+                : 'Inject a simulated rectangular hazard zone and request a live return route from the Python service.'}
             </p>
             {error && <p className="text-xs text-red-400 font-mono mt-1">{error}</p>}
           </div>

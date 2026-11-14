@@ -34,7 +34,7 @@ export const Header: React.FC<HeaderProps> = ({
             </h1>
           </div>
           <p className="text-xs text-slate-400 font-mono hidden sm:block">
-            Gale Crater Robotic Rover Mission Control • Mount Sharp Sector • Lat 4.84°S, Long 137.42°E
+            Gale Crater Robotic Rover Mission Control • Mount Sharp Sector • Lat 4.805°S, Long 137.38°E
           </p>
         </div>
       </div>
@@ -92,10 +92,10 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
           <button
             onClick={onCenterTarget}
-            title="Recenter Map on Mount Sharp Boxwork Target"
+            title="Recenter Map on Science Target Candidate"
             className="px-2.5 py-1 text-xs font-mono rounded bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-cyan-500/30 transition-all cursor-pointer flex items-center gap-1"
           >
-            <span>[Boxwork Target]</span>
+            <span>[Science Target Candidate]</span>
           </button>
           {onCenterRover && (
             <button

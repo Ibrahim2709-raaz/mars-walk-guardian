@@ -19,6 +19,7 @@ import {
   MINERALS_GEOJSON,
   SLOPES_GEOJSON
 } from '../data/marsGeoData';
+import { cellToLngLat } from '../data/terrainSites';
 import { LatLng, LayerVisibility, RouteData } from '../types';
 
 interface MarsMapProps {
@@ -26,6 +27,7 @@ interface MarsMapProps {
   isEmergency: boolean;
   normalRoute: RouteData | null;
   emergencyRoute: RouteData | null;
+  blockedHazardCells: { row: number; column: number }[] | null;
   focusedCoordinates: LatLng | null;
   onClearFocus: () => void;
 }
@@ -65,6 +67,7 @@ export const MarsMap: React.FC<MarsMapProps> = ({
   isEmergency,
   normalRoute,
   emergencyRoute,
+  blockedHazardCells,
   focusedCoordinates,
   onClearFocus
 }) => {
@@ -184,6 +187,20 @@ export const MarsMap: React.FC<MarsMapProps> = ({
         paint: { 'line-color': '#f87171', 'line-width': 2, 'line-opacity': 0.35, 'line-dasharray': [3, 2] }
       });
 
+      // Blocked hazard zone polygon (initially empty — populated when emergency is activated)
+      map.addSource('blocked-hazard-source', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      });
+      map.addLayer({
+        id: 'blocked-hazard-fill', type: 'fill', source: 'blocked-hazard-source',
+        paint: { 'fill-color': '#ef4444', 'fill-opacity': 0.30 }
+      });
+      map.addLayer({
+        id: 'blocked-hazard-outline', type: 'line', source: 'blocked-hazard-source',
+        paint: { 'line-color': '#f87171', 'line-width': 2, 'line-dasharray': [4, 3] }
+      });
+
       const showOverlayPopup = (event: MapLayerMouseEvent) => {
         const properties = event.features?.[0]?.properties;
         if (!properties) return;
@@ -197,6 +214,7 @@ export const MarsMap: React.FC<MarsMapProps> = ({
       map.on('click', 'hazards-fill', showOverlayPopup);
       map.on('click', 'minerals-fill', showOverlayPopup);
       map.on('click', 'slopes-fill', showOverlayPopup);
+      map.on('click', 'blocked-hazard-fill', showOverlayPopup);
 
       const bounds = new LngLatBounds(GALE_BASE_COORDINATES, GALE_BASE_COORDINATES)
         .extend(BOXWORK_TARGET_COORDINATES);
@@ -216,13 +234,13 @@ export const MarsMap: React.FC<MarsMapProps> = ({
       .addTo(map);
 
     const targetMarker = new Marker({
-      element: markerElement('◆', '[CANDIDATE] SCIENCE TARGET', '#22d3ee')
+      element: markerElement('◆', 'SCIENCE TARGET CANDIDATE', '#22d3ee')
     })
       .setLngLat(BOXWORK_TARGET_COORDINATES)
       .setPopup(new Popup({ offset: 25 }).setHTML(popupHtml(
         '[WAYPOINT-LINKED CANDIDATE]',
         'SOL 4621 SCIENCE-TARGET CANDIDATE',
-        '137.37950662° E, 4.80541641° S<br/>DTM elevation: about -3,622.49 m<br/>Exact boxwork ridge at this coordinate is not confirmed.',
+        '137.37950662° E, 4.80541641° S<br/>DTM elevation: about -3,622.49 m<br/>Exact ridge formation at this coordinate is not confirmed. Connected to Sol 4621 waypoint.',
         '#22d3ee'
       )))
       .addTo(map);
@@ -265,10 +283,51 @@ export const MarsMap: React.FC<MarsMapProps> = ({
         ?.setData(routeFeature(normalRoute, GALE_BASE_COORDINATES));
       (map.getSource('route-emergency-source') as GeoJSONSource | undefined)
         ?.setData(routeFeature(emergencyRoute, BOXWORK_TARGET_COORDINATES));
+
+      const hazardSource = map.getSource('blocked-hazard-source') as GeoJSONSource | undefined;
+      if (hazardSource) {
+        if (isEmergency && blockedHazardCells && blockedHazardCells.length > 0) {
+          // Bounding box of blocked cells
+          let minRow = Infinity, maxRow = -Infinity, minCol = Infinity, maxCol = -Infinity;
+          for (const cell of blockedHazardCells) {
+            if (cell.row < minRow) minRow = cell.row;
+            if (cell.row > maxRow) maxRow = cell.row;
+            if (cell.column < minCol) minCol = cell.column;
+            if (cell.column > maxCol) maxCol = cell.column;
+          }
+          // Get corner coordinates (expand slightly by half cell for full coverage)
+          const nw = cellToLngLat(minRow, minCol);
+          const ne = cellToLngLat(minRow, maxCol + 1);
+          const se = cellToLngLat(maxRow + 1, maxCol + 1);
+          const sw = cellToLngLat(maxRow + 1, minCol);
+
+          hazardSource.setData({
+            type: 'FeatureCollection',
+            features: [
+              {
+                type: 'Feature',
+                properties: {
+                  type: 'Simulated Emergency Hazard Zone',
+                  warning: 'Simulated obstacle grid (rows 62–72, cols 115–135) forcing contingency detour.'
+                },
+                geometry: {
+                  type: 'Polygon',
+                  coordinates: [[nw, ne, se, sw, nw]]
+                }
+              }
+            ]
+          });
+        } else {
+          hazardSource.setData({
+            type: 'FeatureCollection',
+            features: []
+          });
+        }
+      }
     };
     if (map.isStyleLoaded()) update();
     else map.once('load', update);
-  }, [normalRoute, emergencyRoute]);
+  }, [normalRoute, emergencyRoute, isEmergency, blockedHazardCells]);
 
   useEffect(() => {
     const map = mapRef.current;
