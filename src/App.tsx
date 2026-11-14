@@ -7,12 +7,92 @@ import { EmergencyControl } from './components/EmergencyControl';
 import { RouteExplanation } from './components/RouteExplanation';
 import {
   GALE_BASE_COORDINATES,
-  BOXWORK_TARGET_COORDINATES,
-  NORMAL_ROUTE,
-  EMERGENCY_ROUTE
+  BOXWORK_TARGET_COORDINATES
 } from './data/marsGeoData';
+import {
+  BASE_POSITION,
+  buildMockRoutingGrid,
+  MOCK_CELL_SIZE_M,
+  SCIENCE_TARGET_POSITION
+} from './data/mockRoutingGrid';
 import { NOMINAL_TELEMETRY, EMERGENCY_TELEMETRY } from './data/mockTelemetry';
-import { LayerVisibility, LatLng, SuitTelemetry } from './types';
+import { LayerVisibility, LatLng, RouteData, SuitTelemetry, Waypoint } from './types';
+import {
+  calculateRoute,
+  RouteResult,
+  RoutingGridCell
+} from './services/routingApi';
+
+const EMPTY_ROUTE: RouteData = {
+  id: 'route-loading',
+  name: 'Waiting for Python routing service',
+  type: 'normal',
+  color: '#38bdf8',
+  distanceKm: 0,
+  estimatedMinutes: 0,
+  elevationGainMeters: 0,
+  maxSlopeDeg: 0,
+  status: 'standby',
+  rationale: 'Requesting a feasible route from the Python weighted A* service.',
+  coordinates: [GALE_BASE_COORDINATES, GALE_BASE_COORDINATES],
+  waypoints: []
+};
+
+function routeResultToRouteData(result: RouteResult, type: 'normal' | 'emergency'): RouteData {
+  const coordinates = result.path.map((cell): LatLng => [cell.longitude, cell.latitude]);
+  let elevationGainMeters = 0;
+  let maxSlopeDeg = 0;
+
+  for (let index = 1; index < result.path.length; index += 1) {
+    const previous = result.path[index - 1];
+    const current = result.path[index];
+    const diagonal = previous.row !== current.row && previous.column !== current.column;
+    const distanceM = diagonal ? MOCK_CELL_SIZE_M * Math.SQRT2 : MOCK_CELL_SIZE_M;
+    const elevationChange = current.elevation_m - previous.elevation_m;
+    elevationGainMeters += Math.max(0, elevationChange);
+    maxSlopeDeg = Math.max(
+      maxSlopeDeg,
+      Math.atan2(Math.abs(elevationChange), distanceM) * 180 / Math.PI
+    );
+  }
+
+  const waypointStep = Math.max(1, Math.ceil(result.path.length / 5));
+  const selectedCells = result.path.filter(
+    (_, index) => index === 0 || index === result.path.length - 1 || index % waypointStep === 0
+  );
+  const waypoints: Waypoint[] = selectedCells.map((cell, index) => ({
+    id: `${type}-wp-${cell.row}-${cell.column}`,
+    name: index === 0
+      ? type === 'emergency' ? 'Rover fault position' : 'Simulated operations point'
+      : index === selectedCells.length - 1
+      ? type === 'emergency' ? 'Simulated operations point' : 'Boxwork science target'
+      : `Grid checkpoint ${cell.row},${cell.column}`,
+    coordinates: [cell.longitude, cell.latitude],
+    elevationMeters: Number(cell.elevation_m.toFixed(2)),
+    slopeGradeDeg: Number((cell.cross_slope_deg ?? 0).toFixed(1)),
+    terrainType: cell.blocked ? 'Blocked terrain' : cell.roughness > 0.5 ? 'Rough regolith' : 'Traversable regolith',
+    hazardLevel: cell.slip_risk > 0.6 ? 'HIGH' : cell.roughness > 0.5 ? 'MEDIUM' : 'LOW',
+    description: `Python grid cell (${cell.row}, ${cell.column}); slip risk ${cell.slip_risk.toFixed(2)}.`
+  }));
+
+  return {
+    id: `python-${type}-route`,
+    name: type === 'emergency' ? 'Python emergency return route' : 'Python planned science route',
+    type,
+    color: type === 'emergency' ? '#ef4444' : '#38bdf8',
+    distanceKm: Number((result.distance_m / 1000).toFixed(3)),
+    estimatedMinutes: Math.ceil(result.distance_m / 3),
+    elevationGainMeters: Number(elevationGainMeters.toFixed(1)),
+    maxSlopeDeg: Number(maxSlopeDeg.toFixed(1)),
+    status: type === 'emergency' ? 'recommended' : 'active',
+    rationale: `${type === 'emergency' ? 'Fault-aware return' : 'Outbound science'} route calculated by Python weighted A*. ` +
+      `Energy ${result.energy_wh.toFixed(2)} Wh; normalized risk ${result.risk_score.toFixed(2)}; ` +
+      `battery remaining ${result.battery_remaining_wh.toFixed(2)} Wh.` +
+      (result.warnings.length ? ` Warning: ${result.warnings.join(' ')}` : ''),
+    coordinates: coordinates.length >= 2 ? coordinates : [GALE_BASE_COORDINATES, GALE_BASE_COORDINATES],
+    waypoints
+  };
+}
 
 export const App: React.FC = () => {
   const [isEmergency, setIsEmergency] = useState<boolean>(false);
@@ -24,14 +104,83 @@ export const App: React.FC = () => {
   });
   const [telemetry, setTelemetry] = useState<SuitTelemetry>(NOMINAL_TELEMETRY);
   const [focusedCoordinates, setFocusedCoordinates] = useState<LatLng | null>(null);
+  const [normalRoute, setNormalRoute] = useState<RouteData | null>(null);
+  const [emergencyRoute, setEmergencyRoute] = useState<RouteData | null>(null);
+  const [normalRouteResult, setNormalRouteResult] = useState<RouteResult | null>(null);
+  const [isRouting, setIsRouting] = useState<boolean>(true);
+  const [routingError, setRoutingError] = useState<string | null>(null);
 
-  // Toggle Emergency Status
-  const handleToggleEmergency = () => {
-    setIsEmergency((prev) => {
-      const nextState = !prev;
-      setTelemetry(nextState ? EMERGENCY_TELEMETRY : NOMINAL_TELEMETRY);
-      return nextState;
-    });
+  useEffect(() => {
+    const requestNormalRoute = async () => {
+      setIsRouting(true);
+      setRoutingError(null);
+      try {
+        const result = await calculateRoute({
+          grid: buildMockRoutingGrid(),
+          start: BASE_POSITION,
+          target: SCIENCE_TARGET_POSITION,
+          rover_state: {
+            battery_wh: 100,
+            battery_reserve_wh: 10,
+            energy_per_meter_wh: 0.25
+          },
+          options: { cell_size_m: MOCK_CELL_SIZE_M }
+        });
+        if (!result.feasible) throw new Error(result.reason ?? 'No feasible outbound route.');
+        setNormalRouteResult(result);
+        setNormalRoute(routeResultToRouteData(result, 'normal'));
+      } catch (error) {
+        setRoutingError(error instanceof Error ? error.message : 'Python routing service is unavailable.');
+      } finally {
+        setIsRouting(false);
+      }
+    };
+
+    void requestNormalRoute();
+  }, []);
+
+  const handleToggleEmergency = async () => {
+    if (isEmergency) {
+      setIsEmergency(false);
+      setTelemetry(NOMINAL_TELEMETRY);
+      setRoutingError(null);
+      return;
+    }
+
+    if (!normalRouteResult) {
+      setRoutingError('The outbound route must load before an emergency can be simulated.');
+      return;
+    }
+
+    setIsRouting(true);
+    setRoutingError(null);
+    try {
+      const emergencyGrid: RoutingGridCell[][] = buildMockRoutingGrid().map((row) =>
+        row.map((cell) => ({ ...cell }))
+      );
+      const rerouteCell = normalRouteResult.path[Math.floor(normalRouteResult.path.length / 2)];
+      if (rerouteCell) emergencyGrid[rerouteCell.row][rerouteCell.column].blocked = true;
+
+      const result = await calculateRoute({
+        grid: emergencyGrid,
+        start: SCIENCE_TARGET_POSITION,
+        target: BASE_POSITION,
+        rover_state: {
+          battery_wh: 65,
+          battery_reserve_wh: 10,
+          energy_per_meter_wh: 0.25
+        },
+        options: { cell_size_m: MOCK_CELL_SIZE_M }
+      });
+      if (!result.feasible) throw new Error(result.reason ?? 'No feasible emergency return route.');
+      setEmergencyRoute(routeResultToRouteData(result, 'emergency'));
+      setIsEmergency(true);
+      setTelemetry(EMERGENCY_TELEMETRY);
+    } catch (error) {
+      setRoutingError(error instanceof Error ? error.message : 'Emergency routing failed.');
+    } finally {
+      setIsRouting(false);
+    }
   };
 
   // Toggle Map Layer
@@ -81,7 +230,7 @@ export const App: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const activeRoute = isEmergency ? EMERGENCY_ROUTE : NORMAL_ROUTE;
+  const activeRoute = isEmergency ? emergencyRoute ?? EMPTY_ROUTE : normalRoute ?? EMPTY_ROUTE;
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 font-sans">
@@ -102,6 +251,8 @@ export const App: React.FC = () => {
             <MarsMap
               layers={layers}
               isEmergency={isEmergency}
+              normalRoute={normalRoute}
+              emergencyRoute={emergencyRoute}
               focusedCoordinates={focusedCoordinates}
               onClearFocus={() => setFocusedCoordinates(null)}
             />
@@ -119,6 +270,8 @@ export const App: React.FC = () => {
           {/* Emergency Contingency Action Box */}
           <EmergencyControl
             isEmergency={isEmergency}
+            isRouting={isRouting}
+            error={routingError}
             onToggleEmergency={handleToggleEmergency}
           />
 

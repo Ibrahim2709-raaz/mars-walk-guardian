@@ -3,18 +3,18 @@ import maplibregl, { Map as MapLibreMap, Marker, Popup, NavigationControl, Scale
 import {
   GALE_BASE_COORDINATES,
   BOXWORK_TARGET_COORDINATES,
-  CURRENT_ASTRONAUT_COORDINATES,
-  NORMAL_ROUTE,
-  EMERGENCY_ROUTE,
+  CURRENT_ROVER_COORDINATES,
   SLOPES_GEOJSON,
   HAZARDS_GEOJSON,
   MINERALS_GEOJSON
 } from '../data/marsGeoData';
-import { LayerVisibility, LatLng } from '../types';
+import { LayerVisibility, LatLng, RouteData } from '../types';
 
 interface MarsMapProps {
   layers: LayerVisibility;
   isEmergency: boolean;
+  normalRoute: RouteData | null;
+  emergencyRoute: RouteData | null;
   focusedCoordinates: LatLng | null;
   onClearFocus: () => void;
 }
@@ -22,6 +22,8 @@ interface MarsMapProps {
 export const MarsMap: React.FC<MarsMapProps> = ({
   layers,
   isEmergency,
+  normalRoute,
+  emergencyRoute,
   focusedCoordinates,
   onClearFocus
 }) => {
@@ -70,8 +72,11 @@ export const MarsMap: React.FC<MarsMapProps> = ({
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style: marsStyle,
-      center: [137.405, -4.865],
-      zoom: 12.6,
+      center: [
+        (GALE_BASE_COORDINATES[0] + BOXWORK_TARGET_COORDINATES[0]) / 2,
+        (GALE_BASE_COORDINATES[1] + BOXWORK_TARGET_COORDINATES[1]) / 2
+      ],
+      zoom: 15.8,
       minZoom: 9,
       maxZoom: 16,
       pitch: 25,
@@ -203,10 +208,10 @@ export const MarsMap: React.FC<MarsMapProps> = ({
         type: 'geojson',
         data: {
           type: 'Feature',
-          properties: { name: NORMAL_ROUTE.name },
+          properties: { name: 'Python normal route' },
           geometry: {
             type: 'LineString',
-            coordinates: NORMAL_ROUTE.coordinates
+            coordinates: [GALE_BASE_COORDINATES, GALE_BASE_COORDINATES]
           }
         }
       });
@@ -248,10 +253,10 @@ export const MarsMap: React.FC<MarsMapProps> = ({
         type: 'geojson',
         data: {
           type: 'Feature',
-          properties: { name: EMERGENCY_ROUTE.name },
+          properties: { name: 'Python emergency route' },
           geometry: {
             type: 'LineString',
-            coordinates: EMERGENCY_ROUTE.coordinates
+            coordinates: [BOXWORK_TARGET_COORDINATES, BOXWORK_TARGET_COORDINATES]
           }
         }
       });
@@ -442,7 +447,7 @@ export const MarsMap: React.FC<MarsMapProps> = ({
       `);
 
     const astronautMarker = new Marker({ element: astronautEl })
-      .setLngLat(CURRENT_ASTRONAUT_COORDINATES)
+      .setLngLat(CURRENT_ROVER_COORDINATES)
       .setPopup(astronautPopup)
       .addTo(map);
 
@@ -483,35 +488,74 @@ export const MarsMap: React.FC<MarsMapProps> = ({
     }
   }, [layers]);
 
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const updateRouteSources = () => {
+      const normalSource = map.getSource('route-normal-source') as maplibregl.GeoJSONSource | undefined;
+      if (normalSource && normalRoute) {
+        normalSource.setData({
+          type: 'Feature',
+          properties: { name: normalRoute.name },
+          geometry: { type: 'LineString', coordinates: normalRoute.coordinates }
+        });
+      }
+
+      const emergencySource = map.getSource('route-emergency-source') as maplibregl.GeoJSONSource | undefined;
+      if (emergencySource && emergencyRoute) {
+        emergencySource.setData({
+          type: 'Feature',
+          properties: { name: emergencyRoute.name },
+          geometry: { type: 'LineString', coordinates: emergencyRoute.coordinates }
+        });
+      }
+    };
+
+    if (map.isStyleLoaded()) updateRouteSources();
+    else map.once('load', updateRouteSources);
+
+    return () => {
+      map.off('load', updateRouteSources);
+    };
+  }, [normalRoute, emergencyRoute]);
+
   // Update Route Appearance when Emergency changes
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map) return;
 
-    if (map.getLayer('route-normal-glow')) {
-      map.setPaintProperty('route-normal-glow', 'line-opacity', isEmergency ? 0.15 : 0.45);
-      map.setPaintProperty('route-normal-core', 'line-opacity', isEmergency ? 0.3 : 0.95);
-      map.setPaintProperty('route-normal-core', 'line-dasharray', isEmergency ? [2, 3] : [1]);
-    }
+    const updateRoutePresentation = () => {
+      if (map.getLayer('route-normal-glow')) {
+        map.setPaintProperty('route-normal-glow', 'line-opacity', isEmergency ? 0.15 : 0.45);
+        map.setPaintProperty('route-normal-core', 'line-opacity', isEmergency ? 0.3 : 0.95);
+        map.setPaintProperty('route-normal-core', 'line-dasharray', isEmergency ? [2, 3] : [1]);
+      }
 
-    if (map.getLayer('route-emergency-glow')) {
-      map.setPaintProperty('route-emergency-glow', 'line-opacity', isEmergency ? 0.8 : 0.2);
-      map.setPaintProperty('route-emergency-glow', 'line-width', isEmergency ? 14 : 5);
-      map.setPaintProperty('route-emergency-core', 'line-opacity', isEmergency ? 1.0 : 0.4);
-      map.setPaintProperty('route-emergency-core', 'line-width', isEmergency ? 5 : 2);
-    }
+      if (map.getLayer('route-emergency-glow')) {
+        map.setPaintProperty('route-emergency-glow', 'line-opacity', isEmergency ? 0.8 : 0.2);
+        map.setPaintProperty('route-emergency-glow', 'line-width', isEmergency ? 14 : 5);
+        map.setPaintProperty('route-emergency-core', 'line-opacity', isEmergency ? 1.0 : 0.4);
+        map.setPaintProperty('route-emergency-core', 'line-width', isEmergency ? 5 : 2);
+      }
 
-    // Auto fit/pan to emergency route if emergency initiated
-    if (isEmergency) {
-      map.flyTo({
-        center: [137.408, -4.860],
-        zoom: 13.0,
-        pitch: 35,
-        bearing: 20,
-        duration: 1500
-      });
-    }
-  }, [isEmergency]);
+      const activeCoordinates = isEmergency ? emergencyRoute?.coordinates : normalRoute?.coordinates;
+      if (activeCoordinates && activeCoordinates.length >= 2) {
+        const bounds = activeCoordinates.reduce(
+          (currentBounds, coordinate) => currentBounds.extend(coordinate),
+          new maplibregl.LngLatBounds(activeCoordinates[0], activeCoordinates[0])
+        );
+        map.fitBounds(bounds, { padding: 70, maxZoom: 16, duration: 1200 });
+      }
+    };
+
+    if (map.isStyleLoaded()) updateRoutePresentation();
+    else map.once('load', updateRoutePresentation);
+
+    return () => {
+      map.off('load', updateRoutePresentation);
+    };
+  }, [isEmergency, normalRoute, emergencyRoute]);
 
   // Pan to focused coordinates if requested
   useEffect(() => {

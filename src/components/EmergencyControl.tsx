@@ -3,11 +3,15 @@ import { ShieldAlert, RotateCcw, AlertTriangle, ArrowRight } from 'lucide-react'
 
 interface EmergencyControlProps {
   isEmergency: boolean;
-  onToggleEmergency: () => void;
+  isRouting: boolean;
+  error?: string | null;
+  onToggleEmergency: () => void | Promise<void>;
 }
 
 export const EmergencyControl: React.FC<EmergencyControlProps> = ({
   isEmergency,
+  isRouting,
+  error,
   onToggleEmergency
 }) => {
   return (
@@ -30,31 +34,35 @@ export const EmergencyControl: React.FC<EmergencyControlProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-aerospace font-bold text-sm tracking-wide text-slate-100">
-                {isEmergency ? 'SIMULATED EMERGENCY EVACUATION VECTOR' : 'TACTICAL CONTINGENCY CONTROLS'}
+                {isEmergency ? 'SIMULATED ROVER FAULT RETURN' : 'ROVER CONTINGENCY CONTROLS'}
               </h3>
               <span className="badge-simulated text-[9px]">[SIMULATED]</span>
             </div>
             <p className="text-xs text-slate-400 font-mono mt-0.5">
               {isEmergency
-                ? 'Active egress vector engaged: Downhill hardpan basalt corridor back to Gale Base Airlock-1.'
-                : 'Test automated EVA abort protocol, recalculating real-time rapid retreat vectors.'}
+                ? 'Python weighted A* calculated a feasible return route to the simulated operations point.'
+                : 'Inject a blocked-path fault and request a new safe return route from the Python service.'}
             </p>
+            {error && <p className="text-xs text-red-400 font-mono mt-1">{error}</p>}
           </div>
         </div>
 
         {/* Big Action Button */}
         <button
           onClick={onToggleEmergency}
+          disabled={isRouting}
           className={`w-full sm:w-auto px-5 py-2.5 rounded-lg font-aerospace font-bold text-xs tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg ${
             isEmergency
               ? 'bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 shadow-slate-950/60'
               : 'bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white border border-red-400/50 shadow-red-950/60 emergency-flash'
           }`}
         >
-          {isEmergency ? (
+          {isRouting ? (
+            <span>CALCULATING ROUTE…</span>
+          ) : isEmergency ? (
             <>
               <RotateCcw className="w-4 h-4 text-cyan-400" />
-              <span>RESET TO NOMINAL WALK</span>
+              <span>RESET TO NOMINAL ROUTE</span>
             </>
           ) : (
             <>

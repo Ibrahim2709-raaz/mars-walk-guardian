@@ -1,8 +1,9 @@
 import { RouteData, ScienceMarker, LatLng } from '../types';
+import { MOCK_BASE_COORDINATES, MOCK_TARGET_COORDINATES } from './mockRoutingGrid';
 
-export const GALE_BASE_COORDINATES: LatLng = [137.419, -4.842];
-export const BOXWORK_TARGET_COORDINATES: LatLng = [137.382, -4.892];
-export const CURRENT_ASTRONAUT_COORDINATES: LatLng = [137.396, -4.879];
+export const GALE_BASE_COORDINATES: LatLng = MOCK_BASE_COORDINATES;
+export const BOXWORK_TARGET_COORDINATES: LatLng = MOCK_TARGET_COORDINATES;
+export const CURRENT_ROVER_COORDINATES: LatLng = MOCK_TARGET_COORDINATES;
 
 export const GALE_BASE_MARKER: ScienceMarker = {
   id: 'gale-base',
