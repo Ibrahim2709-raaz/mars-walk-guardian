@@ -33,7 +33,7 @@ jobs:
 
       - name: Build frontend
         env:
-          VITE_ROUTING_API_URL: ${{ vars.VITE_ROUTING_API_URL }}
+          VITE_ROUTING_API_URL: https://mars-walk-guardian-api.onrender.com
         run: npm run build -- --base=/mars-walk-guardian/
 
       - name: Configure GitHub Pages
