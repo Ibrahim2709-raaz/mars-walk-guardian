@@ -47,6 +47,7 @@ interface Mars3DSceneProps {
   focusedCoordinates?: [number, number] | null;
   onClearFocusedCoordinates?: () => void;
   onSelectWaypoint?: (coords: [number, number]) => void;
+  onSelectTargetLocation?: (target: { id?: string; name: string; coordinates: [number, number]; groundElevationM?: number; description?: string }) => void;
 }
 
 export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
@@ -63,7 +64,8 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
   onClearSelectedBookmark,
   focusedCoordinates,
   onClearFocusedCoordinates,
-  onSelectWaypoint
+  onSelectWaypoint,
+  onSelectTargetLocation
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<SceneView | null>(null);
@@ -1564,6 +1566,23 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
+                onSelectTargetLocation?.({
+                  name: clickedLocation.name,
+                  coordinates: clickedLocation.coordinates,
+                  groundElevationM: clickedLocation.elevationM,
+                  description: clickedLocation.description
+                });
+                setClickedLocation(null);
+                focusGraphicsLayerRef.current?.removeAll();
+              }}
+              className="flex-1 py-2 px-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs rounded-lg shadow-lg flex items-center justify-center gap-1.5 cursor-pointer transition-all border border-cyan-400/50"
+              title="Calculate rover route and mission profile to this destination"
+            >
+              <span>🧭 ROUTE TO TARGET</span>
+            </button>
+
+            <button
+              onClick={() => {
                 const pt = new Point({
                   x: clickedLocation.coordinates[0],
                   y: clickedLocation.coordinates[1],
@@ -1573,9 +1592,9 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
                 focusGraphicsLayerRef.current?.removeAll();
                 void dropToSurfaceAt(pt);
               }}
-              className="flex-1 py-2 px-3 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-xs rounded-lg shadow-lg flex items-center justify-center gap-2 cursor-pointer transition-all border border-orange-400/50"
+              className="py-2 px-3 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-xs rounded-lg shadow-lg flex items-center justify-center gap-1 cursor-pointer transition-all border border-orange-400/50"
             >
-              <span>🚀 DROP & WALK HERE (1.7m AGL)</span>
+              <span>🚀 WALK</span>
             </button>
 
             <button
@@ -1599,9 +1618,9 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
                   { duration: 1800, easing: 'in-out-cubic' as any }
                 );
               }}
-              className="py-2 px-3 bg-slate-900 hover:bg-slate-800 text-cyan-300 font-bold text-xs rounded-lg border border-cyan-500/40 hover:border-cyan-400 cursor-pointer transition-all"
+              className="py-2 px-2.5 bg-slate-900 hover:bg-slate-800 text-cyan-300 font-bold text-xs rounded-lg border border-cyan-500/40 hover:border-cyan-400 cursor-pointer transition-all"
             >
-              🔍 FLY CLOSE
+              🔍 FLY
             </button>
           </div>
         </div>

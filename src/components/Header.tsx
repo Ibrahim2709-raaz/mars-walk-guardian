@@ -14,6 +14,7 @@ interface HeaderProps {
   onCenterBase: () => void;
   onCenterTarget: () => void;
   onCenterRover?: () => void;
+  activeTargetName?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -25,7 +26,8 @@ export const Header: React.FC<HeaderProps> = ({
   isBookmarksOpen,
   onCenterBase,
   onCenterTarget,
-  onCenterRover
+  onCenterRover,
+  activeTargetName
 }) => {
   return (
     <header className="h-16 border-b border-orange-500/20 bg-slate-950/90 backdrop-blur-md px-3 lg:px-6 flex items-center justify-between z-30 relative select-none">
@@ -41,10 +43,16 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="text-[10px] px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30 font-mono font-medium">
                 GCS_Mars_2000
               </span>
+              {activeTargetName && (
+                <span className="hidden sm:inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-mono font-bold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                  TARGET: {activeTargetName}
+                </span>
+              )}
             </h1>
           </div>
           <p className="text-[11px] text-slate-400 font-mono hidden md:block">
-            ArcGIS 3D Globe &amp; Surface Walking • Gale Crater Sector • Lat 4.805°S, Long 137.38°E
+            ArcGIS 3D Globe &amp; Surface Walking • Gale Sector Origin • Lat 4.805°S, Long 137.38°E
           </p>
         </div>
       </div>

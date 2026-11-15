@@ -73,7 +73,13 @@ export const RouteExplanation: React.FC<RouteExplanationProps> = ({
         </div>
         <div className="flex items-center gap-2">
           <span className="text-slate-400 font-mono text-[11px] hidden sm:inline">
-            {routeCalculation.distanceM} m • {routeCalculation.energyWh} Wh
+            {routeCalculation.distanceM >= 1000
+              ? `${(routeCalculation.distanceM / 1000).toFixed(1)} km`
+              : `${routeCalculation.distanceM} m`}{' '}
+            •{' '}
+            {routeCalculation.energyWh >= 1000
+              ? `${(routeCalculation.energyWh / 1000).toFixed(2)} kWh`
+              : `${routeCalculation.energyWh} Wh`}
           </span>
           {isExpanded ? (
             <ChevronUp className="w-4 h-4 text-slate-400" />
@@ -90,13 +96,15 @@ export const RouteExplanation: React.FC<RouteExplanationProps> = ({
             {/* distanceM */}
             <div className="bg-slate-900/80 p-2 rounded-lg border border-slate-800">
               <span className="text-[10px] text-slate-400 flex items-center gap-1 font-mono">
-                <Navigation className="w-3 h-3 text-cyan-400" /> DISTANCE (m)
+                <Navigation className="w-3 h-3 text-cyan-400" /> DISTANCE
               </span>
               <span className="text-sm font-mono font-bold text-slate-100">
-                {routeCalculation.distanceM} m
+                {routeCalculation.distanceM >= 1000
+                  ? `${(routeCalculation.distanceM / 1000).toFixed(1)} km`
+                  : `${routeCalculation.distanceM} m`}
               </span>
               <span className="text-[9px] font-mono text-slate-500 block">
-                Target range: 75-100m
+                {routeCalculation.distanceM >= 1000 ? 'Planetary traverse' : 'Gale micro-terrain'}
               </span>
             </div>
 
@@ -106,7 +114,9 @@ export const RouteExplanation: React.FC<RouteExplanationProps> = ({
                 <Zap className="w-3 h-3 text-amber-400" /> ENERGY DRAW
               </span>
               <span className="text-sm font-mono font-bold text-amber-300">
-                {routeCalculation.energyWh} Wh
+                {routeCalculation.energyWh >= 1000
+                  ? `${(routeCalculation.energyWh / 1000).toFixed(2)} kWh`
+                  : `${routeCalculation.energyWh} Wh`}
               </span>
               <span className="text-[9px] font-mono text-slate-500 block">
                 Total traverse energy
@@ -167,11 +177,23 @@ export const RouteExplanation: React.FC<RouteExplanationProps> = ({
           <div className="p-2 rounded bg-slate-950/80 border border-slate-800 text-[10px] font-mono text-slate-400 flex items-start gap-2">
             <FileCode2 className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
             <div>
-              <span className="text-cyan-300 font-semibold">LIVE ROUTING ENGINE: </span>
-              <code className="text-slate-300">POST /terrain/route</code>
-              <p className="text-slate-400 mt-0.5">
-                Python weighted A* evaluates the cached 201 × 201 HiRISE terrain crop, simulated slip risk, and the approved battery reserve model.
-              </p>
+              {activeRoute.id.startsWith('planetary-') || activeRoute.id.startsWith('emergency-recovery-') ? (
+                <>
+                  <span className="text-cyan-300 font-semibold">PLANETARY GEODESIC ROUTING ENGINE: </span>
+                  <code className="text-slate-300">GCS_Mars_2000 (Great Circle)</code>
+                  <p className="text-slate-400 mt-0.5">
+                    Evaluates spherical geodesic traverse distance, Mars curvature, MMRTG/solar Sol recharge budgets, and topography.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <span className="text-cyan-300 font-semibold">LIVE ROUTING ENGINE: </span>
+                  <code className="text-slate-300">POST /terrain/route</code>
+                  <p className="text-slate-400 mt-0.5">
+                    Python weighted A* evaluates the cached 201 × 201 HiRISE terrain crop, simulated slip risk, and the approved battery reserve model.
+                  </p>
+                </>
+              )}
             </div>
           </div>
 
@@ -195,7 +217,11 @@ export const RouteExplanation: React.FC<RouteExplanationProps> = ({
           <div>
             <div className="text-[11px] font-aerospace font-bold text-slate-300 mb-2 flex items-center justify-between">
               <span>
-                ROBOTIC TRAVERSE STATIONS ({activeRoute.waypoints.length} WAYPOINTS • {routeCalculation.distanceM} m)
+                ROBOTIC TRAVERSE STATIONS ({activeRoute.waypoints.length} STATIONS •{' '}
+                {routeCalculation.distanceM >= 1000
+                  ? `${(routeCalculation.distanceM / 1000).toFixed(1)} km`
+                  : `${routeCalculation.distanceM} m`}
+                )
               </span>
               <span className="text-[10px] font-mono text-slate-500">Click station to locate</span>
             </div>

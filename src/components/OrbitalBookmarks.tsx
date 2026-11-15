@@ -4,6 +4,8 @@ import { MARS_BOOKMARKS, MarsBookmark } from '../data/mars3DData';
 
 interface OrbitalBookmarksProps {
   onFlyTo: (bookmark: MarsBookmark) => void;
+  onSelectTarget?: (bookmark: MarsBookmark) => void;
+  activeTargetId?: string;
   onDropHereMode: () => void;
   isDropModeActive: boolean;
   onClose?: () => void;
@@ -11,6 +13,8 @@ interface OrbitalBookmarksProps {
 
 export const OrbitalBookmarks: React.FC<OrbitalBookmarksProps> = ({
   onFlyTo,
+  onSelectTarget,
+  activeTargetId,
   onDropHereMode,
   isDropModeActive,
   onClose
@@ -133,49 +137,99 @@ export const OrbitalBookmarks: React.FC<OrbitalBookmarksProps> = ({
       {/* Bookmarks List */}
       <div className="overflow-y-auto flex-1 p-2 space-y-1.5">
         {filteredBookmarks.map((bookmark) => {
+          const isCurrentTarget = activeTargetId === bookmark.id;
+
           return (
             <div
               key={bookmark.id}
-              onClick={() => onFlyTo(bookmark)}
-              className="p-2.5 rounded-lg border border-slate-800/80 bg-slate-900/50 hover:bg-slate-800/80 hover:border-orange-500/40 cursor-pointer transition-all flex items-start justify-between gap-2 group"
+              className={`p-2.5 rounded-lg border transition-all flex flex-col gap-2 group ${
+                isCurrentTarget
+                  ? 'border-cyan-400 bg-cyan-950/30 shadow-md shadow-cyan-950/50'
+                  : 'border-slate-800/80 bg-slate-900/50 hover:bg-slate-800/80 hover:border-orange-500/40'
+              }`}
             >
-              <div className="flex items-start gap-2 min-w-0">
-                <span
-                  className={`p-1.5 rounded-md mt-0.5 shrink-0 ${
-                    bookmark.category === 'base'
-                      ? 'bg-orange-500/20 text-orange-400 border border-orange-500/40'
-                      : bookmark.category === 'mission'
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                      : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'
-                  }`}
-                >
-                  {bookmark.category === 'base' ? (
-                    <Compass className="w-3.5 h-3.5" />
-                  ) : bookmark.category === 'mission' ? (
-                    <Rocket className="w-3.5 h-3.5" />
-                  ) : (
-                    <Mountain className="w-3.5 h-3.5" />
-                  )}
-                </span>
-                <div className="min-w-0">
-                  <div className="font-aerospace font-bold text-slate-200 group-hover:text-orange-300 truncate transition-colors">
-                    {bookmark.name}
-                  </div>
-                  <div className="text-[10px] text-slate-400 line-clamp-2 mt-0.5">
-                    {bookmark.description}
-                  </div>
-                  <div className="text-[9px] text-slate-500 font-mono mt-1">
-                    {bookmark.coordinates[0].toFixed(2)}°E, {bookmark.coordinates[1].toFixed(2)}°N
-                    {bookmark.groundElevationApproxM !== undefined && (
-                      <span className="ml-1 text-slate-400">
-                        • Elev: {bookmark.groundElevationApproxM >= 0 ? '+' : ''}
-                        {bookmark.groundElevationApproxM} m
-                      </span>
+              <div
+                onClick={() => {
+                  onFlyTo(bookmark);
+                  onSelectTarget?.(bookmark);
+                }}
+                className="flex items-start justify-between gap-2 cursor-pointer"
+              >
+                <div className="flex items-start gap-2 min-w-0">
+                  <span
+                    className={`p-1.5 rounded-md mt-0.5 shrink-0 ${
+                      bookmark.category === 'base'
+                        ? 'bg-orange-500/20 text-orange-400 border border-orange-500/40'
+                        : bookmark.category === 'mission'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                        : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'
+                    }`}
+                  >
+                    {bookmark.category === 'base' ? (
+                      <Compass className="w-3.5 h-3.5" />
+                    ) : bookmark.category === 'mission' ? (
+                      <Rocket className="w-3.5 h-3.5" />
+                    ) : (
+                      <Mountain className="w-3.5 h-3.5" />
                     )}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-aerospace font-bold text-slate-200 group-hover:text-orange-300 truncate transition-colors">
+                        {bookmark.name}
+                      </span>
+                      {isCurrentTarget && (
+                        <span className="px-1.5 py-0.2 rounded bg-cyan-500/30 text-cyan-300 text-[8px] font-bold border border-cyan-400/50">
+                          ACTIVE TARGET
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-slate-400 line-clamp-2 mt-0.5">
+                      {bookmark.description}
+                    </div>
+                    <div className="text-[9px] text-slate-500 font-mono mt-1">
+                      {bookmark.coordinates[0].toFixed(2)}°E, {bookmark.coordinates[1].toFixed(2)}°N
+                      {bookmark.groundElevationApproxM !== undefined && (
+                        <span className="ml-1 text-slate-400">
+                          • Elev: {bookmark.groundElevationApproxM >= 0 ? '+' : ''}
+                          {bookmark.groundElevationApproxM} m
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
+                <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-orange-400 shrink-0 mt-1 transition-colors" />
               </div>
-              <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-orange-400 shrink-0 mt-1 transition-colors" />
+
+              {/* Action Buttons: Set as Target vs Fly to View */}
+              <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-800/60">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectTarget?.(bookmark);
+                    onFlyTo(bookmark);
+                  }}
+                  className={`flex-1 py-1 px-2 rounded text-[10px] font-aerospace font-bold transition-all flex items-center justify-center gap-1 cursor-pointer border ${
+                    isCurrentTarget
+                      ? 'bg-cyan-600/40 text-cyan-200 border-cyan-400/60'
+                      : 'bg-cyan-950/40 hover:bg-cyan-900/60 text-cyan-300 border-cyan-500/30 hover:border-cyan-400'
+                  }`}
+                >
+                  <span>🧭 {isCurrentTarget ? 'ACTIVE DESTINATION' : 'SET AS ROVER TARGET'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onFlyTo(bookmark);
+                  }}
+                  className="py-1 px-2 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all cursor-pointer"
+                  title="Fly camera to view this landmark"
+                >
+                  <span>👁️ VIEW</span>
+                </button>
+              </div>
             </div>
           );
         })}

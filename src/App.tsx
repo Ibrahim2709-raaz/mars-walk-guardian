@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { EmergencyControl } from './components/EmergencyControl';
 import { Header, ViewMode } from './components/Header';
 import { LayerControls } from './components/LayerControls';
@@ -14,13 +14,18 @@ import {
 } from './data/marsGeoData';
 import { MarsBookmark } from './data/mars3DData';
 import { EMERGENCY_ROVER_TELEMETRY, NOMINAL_ROVER_TELEMETRY } from './data/mockTelemetry';
-import { BASE_POSITION, SCIENCE_TARGET_POSITION } from './data/terrainSites';
+import { BASE_POSITION, SCIENCE_TARGET_POSITION, lngLatToCell } from './data/terrainSites';
 import {
   calculateTerrainRoute,
   RouteResult,
   routeResultToRouteData,
   routeResultToCalculation
 } from './services/routingApi';
+import {
+  calculatePlanetaryRoute,
+  calculatePlanetaryEmergencyRoute,
+  TargetDestinationInfo
+} from './services/planetaryRouting';
 import {
   LatLng,
   LayerVisibility,
@@ -55,7 +60,16 @@ const EMPTY_CALCULATION: RouteCalculationResult = {
   feasible: false
 };
 
+const DEFAULT_TARGET: TargetDestinationInfo = {
+  id: 'science-candidate',
+  name: 'Science Target Candidate',
+  coordinates: BOXWORK_TARGET_COORDINATES,
+  groundElevationM: -3622,
+  description: 'Curiosity Sol 4621 waypoint-linked exploration candidate with mineralized ridges.'
+};
+
 export const App: React.FC = () => {
+  const [currentTarget, setCurrentTarget] = useState<TargetDestinationInfo>(DEFAULT_TARGET);
   const [isEmergency, setIsEmergency] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('3d-orbital');
   const [isDropModeActive, setIsDropModeActive] = useState<boolean>(false);
@@ -73,45 +87,116 @@ export const App: React.FC = () => {
   const [emergencyRoute, setEmergencyRoute] = useState<RouteData | null>(null);
   const [normalRouteResult, setNormalRouteResult] = useState<RouteResult | null>(null);
   const [emergencyRouteResult, setEmergencyRouteResult] = useState<RouteResult | null>(null);
+  const [planetaryCalculation, setPlanetaryCalculation] = useState<RouteCalculationResult | null>(null);
   const [isRouting, setIsRouting] = useState(true);
   const [routingError, setRoutingError] = useState<string | null>(null);
   const [blockedHazardCells, setBlockedHazardCells] = useState<{ row: number; column: number }[] | null>(null);
 
-  useEffect(() => {
-    let timeoutId: number | undefined;
-
-    const requestNormalRoute = async () => {
+  const calculateRouteForTarget = useCallback(
+    async (target: TargetDestinationInfo, emergency: boolean) => {
       setIsRouting(true);
       setRoutingError(null);
+
+      const isLocalGale =
+        Math.abs(target.coordinates[0] - 137.38) < 0.25 &&
+        Math.abs(target.coordinates[1] - (-4.805)) < 0.25;
+
       try {
-        const result = await calculateTerrainRoute({
-          start: BASE_POSITION,
-          target: SCIENCE_TARGET_POSITION,
-          rover_state: {
-            battery_wh: 100,
-            battery_reserve_wh: 10,
-            energy_per_meter_wh: 0.25
+        if (!emergency) {
+          if (isLocalGale) {
+            const targetCell = lngLatToCell(target.coordinates[0], target.coordinates[1]);
+            const result = await calculateTerrainRoute({
+              start: BASE_POSITION,
+              target: targetCell,
+              rover_state: {
+                battery_wh: 100,
+                battery_reserve_wh: 10,
+                energy_per_meter_wh: 0.25
+              }
+            });
+            if (!result.feasible) throw new Error(result.reason ?? 'No feasible outbound route.');
+            setNormalRouteResult(result);
+            setNormalRoute(routeResultToRouteData(result, 'normal'));
+            setPlanetaryCalculation(null);
+          } else {
+            const plan = calculatePlanetaryRoute(CURRENT_ROVER_COORDINATES, target, telemetry.batteryRemainingWh);
+            setNormalRoute(plan.routeData);
+            setPlanetaryCalculation(plan.calculation);
+            setNormalRouteResult(null);
           }
-        });
-        if (!result.feasible) throw new Error(result.reason ?? 'No feasible outbound route.');
-        setNormalRouteResult(result);
-        setNormalRoute(routeResultToRouteData(result, 'normal'));
-        setRoutingError(null);
+          setEmergencyRoute(null);
+          setEmergencyRouteResult(null);
+          setBlockedHazardCells(null);
+        } else {
+          // Emergency Contingency Route
+          if (isLocalGale) {
+            const targetCell = lngLatToCell(target.coordinates[0], target.coordinates[1]);
+            const blockedCells: { row: number; column: number }[] = [];
+            for (let row = 62; row <= 72; row++) {
+              for (let col = 115; col <= 135; col++) {
+                blockedCells.push({ row, column: col });
+              }
+            }
+            const result = await calculateTerrainRoute({
+              start: targetCell,
+              target: BASE_POSITION,
+              rover_state: {
+                battery_wh: 65,
+                battery_reserve_wh: 10,
+                energy_per_meter_wh: 0.25
+              },
+              blocked_cells: blockedCells
+            });
+            if (!result.feasible) throw new Error(result.reason ?? 'No feasible emergency return route.');
+            setEmergencyRouteResult(result);
+            setEmergencyRoute(routeResultToRouteData(result, 'emergency'));
+            setBlockedHazardCells(blockedCells);
+            setPlanetaryCalculation(null);
+          } else {
+            const plan = calculatePlanetaryEmergencyRoute(CURRENT_ROVER_COORDINATES, target, telemetry.batteryRemainingWh);
+            setEmergencyRoute(plan.routeData);
+            setPlanetaryCalculation(plan.calculation);
+            setEmergencyRouteResult(null);
+            setBlockedHazardCells(null);
+          }
+        }
       } catch (error) {
-        setRoutingError(error instanceof Error ? error.message : 'Python routing service is unavailable.');
-        // Auto-retry after 3 seconds if service is still starting up
-        timeoutId = window.setTimeout(requestNormalRoute, 3000);
+        // Fallback for offline local service or grid limits
+        if (!emergency) {
+          const plan = calculatePlanetaryRoute(CURRENT_ROVER_COORDINATES, target, telemetry.batteryRemainingWh);
+          setNormalRoute(plan.routeData);
+          setPlanetaryCalculation(plan.calculation);
+          setNormalRouteResult(null);
+        } else {
+          const plan = calculatePlanetaryEmergencyRoute(CURRENT_ROVER_COORDINATES, target, telemetry.batteryRemainingWh);
+          setEmergencyRoute(plan.routeData);
+          setPlanetaryCalculation(plan.calculation);
+          setEmergencyRouteResult(null);
+        }
+        if (error instanceof Error && !error.message.includes('unavailable') && !error.message.includes('failed')) {
+          setRoutingError(error.message);
+        }
       } finally {
         setIsRouting(false);
       }
-    };
+    },
+    [telemetry.batteryRemainingWh]
+  );
 
-    void requestNormalRoute();
+  useEffect(() => {
+    void calculateRouteForTarget(DEFAULT_TARGET, false);
+  }, [calculateRouteForTarget]);
 
-    return () => {
-      if (timeoutId) window.clearTimeout(timeoutId);
-    };
-  }, []);
+  const handleSelectTarget = useCallback(
+    async (target: TargetDestinationInfo) => {
+      setCurrentTarget(target);
+      setIsEmergency(false);
+      setTelemetry(NOMINAL_ROVER_TELEMETRY);
+      setFocusedCoordinates([...target.coordinates]);
+      await calculateRouteForTarget(target, false);
+    },
+    [calculateRouteForTarget]
+  );
 
   const handleToggleEmergency = async () => {
     if (isEmergency) {
@@ -119,45 +204,13 @@ export const App: React.FC = () => {
       setTelemetry(NOMINAL_ROVER_TELEMETRY);
       setRoutingError(null);
       setBlockedHazardCells(null);
-      return;
-    }
-    if (!normalRouteResult) {
-      setRoutingError('The outbound route must load before an emergency can be simulated.');
+      await calculateRouteForTarget(currentTarget, false);
       return;
     }
 
-    setIsRouting(true);
-    setRoutingError(null);
-    try {
-      // Generate a rectangular simulated hazard zone: rows 62–72, columns 115–135
-      const blockedCells: { row: number; column: number }[] = [];
-      for (let row = 62; row <= 72; row++) {
-        for (let col = 115; col <= 135; col++) {
-          blockedCells.push({ row, column: col });
-        }
-      }
-
-      const result = await calculateTerrainRoute({
-        start: SCIENCE_TARGET_POSITION,
-        target: BASE_POSITION,
-        rover_state: {
-          battery_wh: 65,
-          battery_reserve_wh: 10,
-          energy_per_meter_wh: 0.25
-        },
-        blocked_cells: blockedCells
-      });
-      if (!result.feasible) throw new Error(result.reason ?? 'No feasible emergency return route.');
-      setEmergencyRouteResult(result);
-      setEmergencyRoute(routeResultToRouteData(result, 'emergency'));
-      setBlockedHazardCells(blockedCells);
-      setIsEmergency(true);
-      setTelemetry(EMERGENCY_ROVER_TELEMETRY);
-    } catch (error) {
-      setRoutingError(error instanceof Error ? error.message : 'Emergency routing failed.');
-    } finally {
-      setIsRouting(false);
-    }
+    setIsEmergency(true);
+    setTelemetry(EMERGENCY_ROVER_TELEMETRY);
+    await calculateRouteForTarget(currentTarget, true);
   };
 
   useEffect(() => {
@@ -182,11 +235,13 @@ export const App: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const activeRoute = isEmergency ? emergencyRoute ?? EMPTY_ROUTE : normalRoute ?? EMPTY_ROUTE;
+  const activeRoute = isEmergency ? emergencyRoute ?? normalRoute ?? EMPTY_ROUTE : normalRoute ?? EMPTY_ROUTE;
   const activeResult = isEmergency ? emergencyRouteResult : normalRouteResult;
-  const routeCalculation = activeResult
-    ? routeResultToCalculation(activeResult)
-    : { ...EMPTY_CALCULATION, warnings: routingError ? [routingError] : EMPTY_CALCULATION.warnings };
+  const routeCalculation = planetaryCalculation ?? (
+    activeResult
+      ? routeResultToCalculation(activeResult)
+      : { ...EMPTY_CALCULATION, warnings: routingError ? [routingError] : EMPTY_CALCULATION.warnings }
+  );
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 font-sans">
@@ -197,11 +252,12 @@ export const App: React.FC = () => {
         onChangeViewMode={setViewMode}
         onToggleBookmarks={() => setIsBookmarksOpen((prev) => !prev)}
         isBookmarksOpen={isBookmarksOpen}
+        activeTargetName={currentTarget.name}
         onCenterBase={() => {
           setFocusedCoordinates([...GALE_BASE_COORDINATES]);
         }}
         onCenterTarget={() => {
-          setFocusedCoordinates([...BOXWORK_TARGET_COORDINATES]);
+          setFocusedCoordinates([...currentTarget.coordinates]);
         }}
         onCenterRover={() => {
           setFocusedCoordinates([...CURRENT_ROVER_COORDINATES]);
@@ -259,6 +315,15 @@ export const App: React.FC = () => {
                 focusedCoordinates={focusedCoordinates}
                 onClearFocusedCoordinates={() => setFocusedCoordinates(null)}
                 onSelectWaypoint={setFocusedCoordinates}
+                onSelectTargetLocation={(loc) => {
+                  void handleSelectTarget({
+                    id: loc.id ?? 'custom-target',
+                    name: loc.name,
+                    coordinates: loc.coordinates,
+                    groundElevationM: loc.groundElevationM,
+                    description: loc.description
+                  });
+                }}
               />
             </div>
 
@@ -266,6 +331,17 @@ export const App: React.FC = () => {
             {isBookmarksOpen && viewMode !== '2d-grid' && (
               <div className="absolute top-3 left-3 z-30 animate-in fade-in slide-in-from-left-4 duration-200">
                 <OrbitalBookmarks
+                  activeTargetId={currentTarget.id}
+                  onSelectTarget={(bm) => {
+                    void handleSelectTarget({
+                      id: bm.id,
+                      name: bm.name,
+                      coordinates: bm.coordinates,
+                      groundElevationM: bm.groundElevationApproxM,
+                      description: bm.description,
+                      category: bm.category
+                    });
+                  }}
                   onFlyTo={(bm) => {
                     setSelectedBookmark(bm);
                     setIsBookmarksOpen(false);
