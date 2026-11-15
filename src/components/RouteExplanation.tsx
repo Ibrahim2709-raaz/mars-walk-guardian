@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   Navigation,
   Route,
@@ -18,16 +18,29 @@ interface RouteExplanationProps {
   routeCalculation: RouteCalculationResult;
   isEmergency: boolean;
   onSelectWaypoint: (coords: LatLng) => void;
+  focusedCoordinates?: LatLng | null;
 }
 
 export const RouteExplanation: React.FC<RouteExplanationProps> = ({
   activeRoute,
   routeCalculation,
   isEmergency,
-  onSelectWaypoint
+  onSelectWaypoint,
+  focusedCoordinates
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(true);
   const [selectedWaypointId, setSelectedWaypointId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!focusedCoordinates || !activeRoute?.waypoints) return;
+    const match = activeRoute.waypoints.find(
+      (wp) =>
+        wp?.coordinates &&
+        Math.abs(wp.coordinates[0] - focusedCoordinates[0]) < 0.0001 &&
+        Math.abs(wp.coordinates[1] - focusedCoordinates[1]) < 0.0001
+    );
+    if (match) setSelectedWaypointId(match.id);
+  }, [focusedCoordinates, activeRoute]);
 
   return (
     <div

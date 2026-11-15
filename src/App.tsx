@@ -14,15 +14,19 @@ import {
 } from './data/marsGeoData';
 import { MarsBookmark } from './data/mars3DData';
 import { EMERGENCY_ROVER_TELEMETRY, NOMINAL_ROVER_TELEMETRY } from './data/mockTelemetry';
-import { BASE_POSITION, SCIENCE_TARGET_POSITION, TERRAIN_CELL_SIZE_M } from './data/terrainSites';
-import { calculateTerrainRoute, RouteResult } from './services/routingApi';
+import { BASE_POSITION, SCIENCE_TARGET_POSITION } from './data/terrainSites';
+import {
+  calculateTerrainRoute,
+  RouteResult,
+  routeResultToRouteData,
+  routeResultToCalculation
+} from './services/routingApi';
 import {
   LatLng,
   LayerVisibility,
   RouteCalculationResult,
   RouteData,
-  RoverTelemetry,
-  Waypoint
+  RoverTelemetry
 } from './types';
 
 const EMPTY_ROUTE: RouteData = {
@@ -50,75 +54,6 @@ const EMPTY_CALCULATION: RouteCalculationResult = {
   warnings: ['Waiting for the Python terrain-routing service.'],
   feasible: false
 };
-
-function routeResultToRouteData(result: RouteResult, type: 'normal' | 'emergency'): RouteData {
-  const coordinates = result.path.map((cell): LatLng => [cell.longitude, cell.latitude]);
-  let elevationGainMeters = 0;
-  let maxSlopeDeg = 0;
-
-  for (let index = 1; index < result.path.length; index += 1) {
-    const previous = result.path[index - 1];
-    const current = result.path[index];
-    const diagonal = previous.row !== current.row && previous.column !== current.column;
-    const distanceM = diagonal ? TERRAIN_CELL_SIZE_M * Math.SQRT2 : TERRAIN_CELL_SIZE_M;
-    const elevationChange = current.elevation_m - previous.elevation_m;
-    elevationGainMeters += Math.max(0, elevationChange);
-    maxSlopeDeg = Math.max(
-      maxSlopeDeg,
-      Math.atan2(Math.abs(elevationChange), distanceM) * 180 / Math.PI
-    );
-  }
-
-  const waypointStep = Math.max(1, Math.ceil(result.path.length / 5));
-  const selectedCells = result.path.filter(
-    (_, index) => index === 0 || index === result.path.length - 1 || index % waypointStep === 0
-  );
-  const waypoints: Waypoint[] = selectedCells.map((cell, index) => ({
-    id: `${type}-wp-${cell.row}-${cell.column}`,
-    name: index === 0
-      ? type === 'emergency' ? 'Rover fault position' : 'Gale Rover Base — Simulated Operations Point'
-      : index === selectedCells.length - 1
-      ? type === 'emergency' ? 'Gale Rover Base — Simulated Operations Point' : 'Sol 4621 science-target candidate'
-      : `Terrain-grid checkpoint ${cell.row},${cell.column}`,
-    coordinates: [cell.longitude, cell.latitude],
-    elevationMeters: Number(cell.elevation_m.toFixed(2)),
-    slopeGradeDeg: Number((cell.cross_slope_deg ?? 0).toFixed(1)),
-    terrainType: cell.roughness > 0.5 ? 'Rough DTM cell' : 'Traversable DTM cell',
-    hazardLevel: cell.slip_risk > 0.6 ? 'HIGH' : cell.roughness > 0.5 ? 'MEDIUM' : 'LOW',
-    description: `HiRISE terrain cell (${cell.row}, ${cell.column}); simulated slip risk ${cell.slip_risk.toFixed(2)}.`
-  }));
-
-  return {
-    id: `python-${type}-route`,
-    name: type === 'emergency' ? 'Python emergency return route' : 'Python planned science route',
-    type,
-    color: type === 'emergency' ? '#ef4444' : '#38bdf8',
-    distanceM: Number(result.distance_m.toFixed(2)),
-    estimatedMinutes: Math.ceil(result.distance_m / 3),
-    elevationGainMeters: Number(elevationGainMeters.toFixed(1)),
-    maxSlopeDeg: Number(maxSlopeDeg.toFixed(1)),
-    status: type === 'emergency' ? 'recommended' : 'active',
-    rationale: `${type === 'emergency' ? 'Fault-aware return' : 'Outbound science'} route calculated by Python weighted A*. ` +
-      `Energy ${result.energy_wh.toFixed(2)} Wh; normalized risk ${result.risk_score.toFixed(2)}; ` +
-      `battery remaining ${result.battery_remaining_wh.toFixed(2)} Wh.` +
-      (result.warnings.length ? ` Warning: ${result.warnings.join(' ')}` : ''),
-    coordinates: coordinates.length >= 2 ? coordinates : [GALE_BASE_COORDINATES, GALE_BASE_COORDINATES],
-    waypoints,
-    provenance: 'SYSTEM-DERIVED'
-  };
-}
-
-function routeResultToCalculation(result: RouteResult): RouteCalculationResult {
-  return {
-    path: result.path.map((cell): LatLng => [cell.longitude, cell.latitude]),
-    distanceM: Number(result.distance_m.toFixed(2)),
-    energyWh: Number(result.energy_wh.toFixed(2)),
-    riskScore: result.risk_score,
-    batteryRemainingWh: result.battery_remaining_wh,
-    warnings: result.warnings,
-    feasible: result.feasible
-  };
-}
 
 export const App: React.FC = () => {
   const [isEmergency, setIsEmergency] = useState(false);
@@ -263,13 +198,13 @@ export const App: React.FC = () => {
         onToggleBookmarks={() => setIsBookmarksOpen((prev) => !prev)}
         isBookmarksOpen={isBookmarksOpen}
         onCenterBase={() => {
-          setFocusedCoordinates(GALE_BASE_COORDINATES);
+          setFocusedCoordinates([...GALE_BASE_COORDINATES]);
         }}
         onCenterTarget={() => {
-          setFocusedCoordinates(BOXWORK_TARGET_COORDINATES);
+          setFocusedCoordinates([...BOXWORK_TARGET_COORDINATES]);
         }}
         onCenterRover={() => {
-          setFocusedCoordinates(CURRENT_ROVER_COORDINATES);
+          setFocusedCoordinates([...CURRENT_ROVER_COORDINATES]);
         }}
       />
 
@@ -280,7 +215,14 @@ export const App: React.FC = () => {
         {/* Left / Center Map & 3D Scene View (8 Columns on desktop) */}
         <section className="lg:col-span-8 flex flex-col gap-3 relative" style={{ minHeight: '540px', height: '100%' }}>
           <div className="relative rounded-xl overflow-hidden" style={{ flex: '1 1 0', minHeight: '480px' }}>
-            {viewMode === '2d-grid' ? (
+            <div
+              className="absolute inset-0 w-full h-full transition-opacity duration-200"
+              style={{
+                opacity: viewMode === '2d-grid' ? 1 : 0,
+                pointerEvents: viewMode === '2d-grid' ? 'auto' : 'none',
+                zIndex: viewMode === '2d-grid' ? 10 : 0
+              }}
+            >
               <MarsMap
                 layers={layers}
                 isEmergency={isEmergency}
@@ -290,8 +232,17 @@ export const App: React.FC = () => {
                 focusedCoordinates={focusedCoordinates}
                 onClearFocus={() => setFocusedCoordinates(null)}
               />
-            ) : (
+            </div>
+            <div
+              className="absolute inset-0 w-full h-full transition-opacity duration-200"
+              style={{
+                opacity: viewMode !== '2d-grid' ? 1 : 0,
+                pointerEvents: viewMode !== '2d-grid' ? 'auto' : 'none',
+                zIndex: viewMode !== '2d-grid' ? 10 : 0
+              }}
+            >
               <Mars3DScene
+                layers={layers}
                 isEmergency={isEmergency}
                 normalRoute={normalRoute}
                 emergencyRoute={emergencyRoute}
@@ -307,8 +258,9 @@ export const App: React.FC = () => {
                 onClearSelectedBookmark={() => setSelectedBookmark(null)}
                 focusedCoordinates={focusedCoordinates}
                 onClearFocusedCoordinates={() => setFocusedCoordinates(null)}
+                onSelectWaypoint={setFocusedCoordinates}
               />
-            )}
+            </div>
 
             {/* Bookmarks Drawer Overlay */}
             {isBookmarksOpen && viewMode !== '2d-grid' && (
@@ -332,8 +284,8 @@ export const App: React.FC = () => {
             )}
           </div>
 
-          {/* Layer Controls (Available in 2D grid mode) */}
-          {viewMode === '2d-grid' && (
+          {/* Layer Controls (Available in both 2D grid and 3D globe modes) */}
+          {(viewMode === '2d-grid' || viewMode === '3d-orbital') && (
             <LayerControls
               layers={layers}
               onToggleLayer={(layerKey) => setLayers((previous) => ({
@@ -358,6 +310,7 @@ export const App: React.FC = () => {
             routeCalculation={routeCalculation}
             isEmergency={isEmergency}
             onSelectWaypoint={setFocusedCoordinates}
+            focusedCoordinates={focusedCoordinates}
           />
         </aside>
       </main>

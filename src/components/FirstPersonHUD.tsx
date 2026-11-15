@@ -49,7 +49,7 @@ export const FirstPersonHUD: React.FC<FirstPersonHUDProps> = ({
 
   return (
     <div className="absolute inset-0 pointer-events-none z-30 select-none overflow-hidden flex flex-col justify-between p-3 md:p-6">
-      {/* Top Bar: Crosshairs + Mission Breadcrumb */}
+      {/* Top Bar: Crosshairs + Mode & Controls */}
       <div className="flex items-start justify-between">
         {/* Left: Mode Badge & Quick Exit */}
         <div className="flex items-center gap-2 pointer-events-auto">
@@ -105,7 +105,7 @@ export const FirstPersonHUD: React.FC<FirstPersonHUDProps> = ({
           <div className="text-slate-200 font-bold mb-1 flex items-center gap-1">
             <Footprints className="w-3 h-3 text-orange-400" /> SURFACE CONTROLS
           </div>
-          <div><span className="text-cyan-300">W / A / S / D</span> : Walk</div>
+          <div><span className="text-cyan-300">W / A / S / D</span> or <span className="text-cyan-300">Arrows</span> : Walk</div>
           <div><span className="text-cyan-300">Shift</span> : Sprint (3× Speed)</div>
           <div><span className="text-cyan-300">Mouse Drag / Click</span> : Look Around</div>
           <div><span className="text-cyan-300">Q / E</span> : Eye Height ({telemetry.eyeHeightM.toFixed(1)}m)</div>
@@ -130,7 +130,7 @@ export const FirstPersonHUD: React.FC<FirstPersonHUDProps> = ({
         )}
       </div>
 
-      {/* Bottom Bar: Telemetry Readings + Mobile Touch Controls */}
+      {/* Bottom Bar: Telemetry Readings + Directional Controls */}
       <div className="flex flex-col sm:flex-row items-end sm:items-center justify-between gap-3">
         {/* Left: Tactical Surface HUD Cards */}
         <div className="bg-slate-950/95 border border-orange-500/30 rounded-xl p-3 shadow-2xl backdrop-blur max-w-md w-full font-mono text-xs">
@@ -195,16 +195,17 @@ export const FirstPersonHUD: React.FC<FirstPersonHUDProps> = ({
           </div>
         </div>
 
-        {/* Right: Touch Directional D-Pad for Mobile / Mouse click */}
+        {/* Right: On-screen Directional D-Pad for Walk Navigation */}
         {onVirtualMove && (
-          <div className="pointer-events-auto sm:hidden flex flex-col items-center gap-1 bg-slate-950/80 border border-slate-800 p-2 rounded-xl backdrop-blur">
+          <div className="pointer-events-auto flex flex-col items-center gap-1 bg-slate-950/85 border border-slate-800 p-2 rounded-xl backdrop-blur shadow-2xl">
             <button
               onTouchStart={() => onVirtualMove('forward')}
               onTouchEnd={() => onVirtualMove('stop')}
               onMouseDown={() => onVirtualMove('forward')}
               onMouseUp={() => onVirtualMove('stop')}
-              className="w-10 h-10 rounded bg-slate-900 active:bg-orange-600 text-slate-200 border border-slate-700 flex items-center justify-center cursor-pointer shadow"
+              className="w-9 h-9 rounded bg-slate-900 active:bg-orange-600 hover:bg-slate-800 text-slate-200 border border-slate-700 flex items-center justify-center cursor-pointer shadow transition-colors"
               aria-label="Walk Forward"
+              title="Walk Forward (W or Up Arrow)"
             >
               <ArrowUp className="w-4 h-4" />
             </button>
@@ -214,8 +215,9 @@ export const FirstPersonHUD: React.FC<FirstPersonHUDProps> = ({
                 onTouchEnd={() => onVirtualMove('stop')}
                 onMouseDown={() => onVirtualMove('left')}
                 onMouseUp={() => onVirtualMove('stop')}
-                className="w-10 h-10 rounded bg-slate-900 active:bg-orange-600 text-slate-200 border border-slate-700 flex items-center justify-center cursor-pointer shadow"
+                className="w-9 h-9 rounded bg-slate-900 active:bg-orange-600 hover:bg-slate-800 text-slate-200 border border-slate-700 flex items-center justify-center cursor-pointer shadow transition-colors"
                 aria-label="Strafe Left"
+                title="Strafe Left (A or Left Arrow)"
               >
                 <ArrowLeft className="w-4 h-4" />
               </button>
@@ -224,8 +226,9 @@ export const FirstPersonHUD: React.FC<FirstPersonHUDProps> = ({
                 onTouchEnd={() => onVirtualMove('stop')}
                 onMouseDown={() => onVirtualMove('backward')}
                 onMouseUp={() => onVirtualMove('stop')}
-                className="w-10 h-10 rounded bg-slate-900 active:bg-orange-600 text-slate-200 border border-slate-700 flex items-center justify-center cursor-pointer shadow"
+                className="w-9 h-9 rounded bg-slate-900 active:bg-orange-600 hover:bg-slate-800 text-slate-200 border border-slate-700 flex items-center justify-center cursor-pointer shadow transition-colors"
                 aria-label="Walk Backward"
+                title="Walk Backward (S or Down Arrow)"
               >
                 <ArrowDown className="w-4 h-4" />
               </button>
@@ -234,8 +237,9 @@ export const FirstPersonHUD: React.FC<FirstPersonHUDProps> = ({
                 onTouchEnd={() => onVirtualMove('stop')}
                 onMouseDown={() => onVirtualMove('right')}
                 onMouseUp={() => onVirtualMove('stop')}
-                className="w-10 h-10 rounded bg-slate-900 active:bg-orange-600 text-slate-200 border border-slate-700 flex items-center justify-center cursor-pointer shadow"
+                className="w-9 h-9 rounded bg-slate-900 active:bg-orange-600 hover:bg-slate-800 text-slate-200 border border-slate-700 flex items-center justify-center cursor-pointer shadow transition-colors"
                 aria-label="Strafe Right"
+                title="Strafe Right (D or Right Arrow)"
               >
                 <ArrowRight className="w-4 h-4" />
               </button>

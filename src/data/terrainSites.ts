@@ -25,3 +25,13 @@ export function cellToLngLat(row: number, column: number): LatLng {
     ORIGIN_LAT + row * LAT_STEP
   ];
 }
+
+/** Convert geographic coordinates to approximate grid cell position (clamped to 0..200). */
+export function lngLatToCell(lng: number, lat: number): GridPosition {
+  const col = Math.round((lng - ORIGIN_LNG) / LNG_STEP);
+  const row = Math.round((lat - ORIGIN_LAT) / LAT_STEP);
+  return {
+    row: Math.max(0, Math.min(200, row)),
+    column: Math.max(0, Math.min(200, col))
+  };
+}

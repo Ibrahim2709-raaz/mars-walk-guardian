@@ -32,12 +32,12 @@ export interface MarsBookmark {
 export const MARS_BOOKMARKS: MarsBookmark[] = [
   {
     id: 'gale-base',
-    name: 'Gale Rover Base Alpha',
+    name: '[SIMULATED] Gale Rover Base',
     category: 'base',
     description: 'Simulated operations hub in Gale Crater near Mount Sharp (Aeolis Mons).',
-    coordinates: [137.38017, -4.80426],
+    coordinates: [137.38017231, -4.80425574],
     camera: {
-      position: { x: 137.38017, y: -4.8068, z: -3450 }, // ~180 m above -3631m floor
+      position: { x: 137.38017231, y: -4.8055, z: -3550 },
       heading: 350,
       tilt: 62
     },
@@ -48,11 +48,24 @@ export const MARS_BOOKMARKS: MarsBookmark[] = [
     name: 'Science Target Candidate',
     category: 'base',
     description: 'Curiosity Sol 4621 waypoint-linked exploration candidate with mineralized ridges.',
-    coordinates: [137.37951, -4.80542],
+    coordinates: [137.37950662, -4.80541641],
     camera: {
-      position: { x: 137.37951, y: -4.8078, z: -3470 }, // ~160 m above -3631m floor
+      position: { x: 137.37950662, y: -4.8066, z: -3550 },
       heading: 350,
       tilt: 60
+    },
+    groundElevationApproxM: -3622
+  },
+  {
+    id: 'rover-aer1',
+    name: '[SIMULATED] AER-1 (Rover)',
+    category: 'mission',
+    description: 'Autonomous Exploration Rover platform operating in Gale Crater.',
+    coordinates: [137.37950662, -4.80541641],
+    camera: {
+      position: { x: 137.37950662, y: -4.8066, z: -3560 },
+      heading: 350,
+      tilt: 65
     },
     groundElevationApproxM: -3622
   },
