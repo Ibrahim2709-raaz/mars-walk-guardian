@@ -141,14 +141,14 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
     // 2. Configure Mars 2000 Basemap Imagery
     const marsImagery = new TileLayer({
       id: 'marsImagery',
-      url: 'https://astro.arcgis.com/arcgis/rest/services/OnMars/MDIM/MapServer',
+      portalItem: { id: '1efb16809db84f0c892b9b0662dab0c8' },
       title: 'Mars Global Color Imagery',
       copyright: 'USGS Astrogeology Science Center, NASA, JPL, Esri'
     });
 
     const marsHiRise = new TileLayer({
       id: 'marsHiRise',
-      url: 'https://astro.arcgis.com/arcgis/rest/services/OnMars/HiRISE/MapServer',
+      portalItem: { id: 'c1c4c750a2154842ae523c984cc14fa5' },
       title: 'Mars HiRISE High-Resolution Surface Imagery',
       visible: true
     });
@@ -197,20 +197,45 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
         }
       },
       camera: {
-        position: new Point({
-          x: 137.37984,
-          y: -4.8070,
-          z: -3440,
+        position: {
+          x: 137.38017,
+          y: -4.85,
+          z: 38000,
           spatialReference: marsSpatialReference
-        }),
-        heading: 355,
-        tilt: 58
+        },
+        heading: 350,
+        tilt: 62
       },
       popupEnabled: false,
       ui: { components: ['compass', 'navigation-toggle'] }
     });
 
     viewRef.current = view;
+
+    // Once globe and elevation layers finish loading, smoothly transition into the Gale Crater mission frame
+    view.when(() => {
+      const midLng = (GALE_BASE_COORDINATES[0] + BOXWORK_TARGET_COORDINATES[0]) / 2;
+      const midLat = (GALE_BASE_COORDINATES[1] + BOXWORK_TARGET_COORDINATES[1]) / 2;
+      const cameraPosition = new Point({
+        x: midLng,
+        y: midLat - 0.0028,
+        z: -3460,
+        spatialReference: marsSpatialReference
+      });
+      setTimeout(() => {
+        if (!initialFocusDoneRef.current && viewRef.current) {
+          initialFocusDoneRef.current = true;
+          void viewRef.current.goTo(
+            new Camera({
+              position: cameraPosition,
+              heading: 0,
+              tilt: 46
+            }),
+            { duration: 2000, easing: 'in-out-cubic' as any }
+          );
+        }
+      }, 1000);
+    });
 
     // Monitor terrain tile loading state
     reactiveUtils.watch(
@@ -821,30 +846,24 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
     const view = viewRef.current;
     if (!view) return;
 
-    const missionCamera = new Camera({
-      position: new Point({
-        x: 137.37984,
-        y: -4.8070,
-        z: -3440,
-        spatialReference: marsSpatialReference
-      }),
-      heading: 355,
-      tilt: 58
+    const midLng = (GALE_BASE_COORDINATES[0] + BOXWORK_TARGET_COORDINATES[0]) / 2;
+    const midLat = (GALE_BASE_COORDINATES[1] + BOXWORK_TARGET_COORDINATES[1]) / 2;
+    const cameraPosition = new Point({
+      x: midLng,
+      y: midLat - 0.0028,
+      z: -3460,
+      spatialReference: marsSpatialReference
     });
 
-    await view.goTo(missionCamera, { duration: 1800, easing: 'in-out-cubic' as any });
+    await view.goTo(
+      new Camera({
+        position: cameraPosition,
+        heading: 0,
+        tilt: 46
+      }),
+      { duration: 1600, easing: 'in-out-cubic' as any }
+    );
   }, []);
-
-  // Auto-focus on the mission route on initial load once normalRoute is available
-  useEffect(() => {
-    if (normalRoute && normalRoute.coordinates.length >= 2 && !initialFocusDoneRef.current) {
-      initialFocusDoneRef.current = true;
-      const timer = setTimeout(() => {
-        void focusGaleMissionRoute();
-      }, 400);
-      return () => clearTimeout(timer);
-    }
-  }, [normalRoute, focusGaleMissionRoute]);
 
   // Respond to prop mode changes (e.g. Header button click)
   useEffect(() => {
@@ -1090,31 +1109,32 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
       const isGale = Math.abs(targetLng - 137.38) < 0.5 && Math.abs(targetLat - -4.805) < 0.5;
 
       if (isGale) {
-        const targetCamera = new Camera({
-          position: new Point({
-            x: targetLng,
-            y: targetLat - 0.002,
-            z: -3440,
-            spatialReference: marsSpatialReference
-          }),
-          heading: 350,
-          tilt: 58
+        const cameraPosition = new Point({
+          x: targetLng,
+          y: targetLat - 0.0028,
+          z: -3460,
+          spatialReference: marsSpatialReference
         });
 
-        void view.goTo(targetCamera, { duration: 1600, easing: 'in-out-cubic' as any });
+        void view.goTo(
+          new Camera({
+            position: cameraPosition,
+            heading: 0,
+            tilt: 46
+          }),
+          { duration: 1600, easing: 'in-out-cubic' as any }
+        );
       } else {
-        const targetCamera = new Camera({
-          position: new Point({
-            x: targetLng,
-            y: targetLat - 0.04,
-            z: 25000,
-            spatialReference: marsSpatialReference
-          }),
-          heading: 350,
-          tilt: 45
-        });
-
-        void view.goTo(targetCamera, { duration: 2000, easing: 'in-out-cubic' as any });
+        // Planetary bookmark: Use goTo with target geometry and heading/tilt
+        // ArcGIS automatically derives camera distance above the actual DEM surface (e.g. Olympus Mons peak or Valles Marineris canyon floor)
+        void view.goTo(
+          {
+            target: targetPoint,
+            heading: 0,
+            tilt: 35
+          },
+          { duration: 2000, easing: 'in-out-cubic' as any }
+        );
       }
     }
 
