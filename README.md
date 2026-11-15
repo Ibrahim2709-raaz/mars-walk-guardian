@@ -38,6 +38,12 @@ Mars Rover Guardian is an interactive dual-mode space mission and planetary expl
 
 ---
 
+### 3D Rover terrain imagery
+
+The 3D Rover view drapes a contrast-adjusted crop of the HiRISE red-band orthophoto `PSP_009149_1750_RED_A_01_ORTHO` (NASA/JPL-Caltech/UArizona) over the measured HiRISE elevation mesh. The 804 × 804 crop starts at zero-based pixel column 5728 and row 29879 in the orthoimage. The imagery has approximately 0.25 m pixels and covers the same area as the 201 × 201 elevation grid. Surface tint and lighting are illustrative.
+
+[HiRISE terrain and orthophoto products](https://www.uahirise.org/dtm/dtm.php?ID=PSP_009149_1750)
+
 ## First-Person Camera Controller Architecture
 
 The first-person camera controller (`src/components/Mars3DScene.tsx`) operates via an asynchronous, requestAnimationFrame-backed update loop:
