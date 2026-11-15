@@ -1,0 +1,99 @@
+{
+  "title": "Mars Walk Guardian — HiRISE local terrain grid",
+  "status": "Measured elevation crop verified for valid pixels; roughness derived; slip risk and blocked simulated. Site suitability and target geology remain provisional.",
+  "coordinate_system": {
+    "horizontal": "Equirectangular, planetocentric latitude, east-positive longitude; local spherical radius 3396.19 km",
+    "vertical": "Mars 2000 equipotential surface",
+    "units": "degrees / meters",
+    "classification": "Measured product metadata"
+  },
+  "grid": {
+    "width_cells": 201,
+    "height_cells": 201,
+    "cell_size_m": 1.0117467945795,
+    "source_dtm_pixel_size_m": 1.0117467945795,
+    "resampling": "None; native DTM pixels",
+    "crop_bounds": {
+      "west": 137.37779118130354,
+      "east": 137.38122206637078,
+      "north": -4.803701002104033,
+      "south": -4.807131826961983
+    },
+    "crop_bounds_classification": "Derived from DTM map projection and pixel indices",
+    "nodata_handling": "MISSING_CONSTANT 16#FF7FFFFB# and values outside VALID_MINIMUM / VALID_MAXIMUM are marked valid=false and elevation_m blank; zero nodata cells in this crop; roughness is blank for the outer two-cell border because the full 5x5 neighborhood is unavailable"
+  },
+  "base": {
+    "name": "Simulated Gale Base candidate",
+    "row": 32,
+    "column": 139,
+    "latitude": -4.804255737466637,
+    "longitude_east": 137.3801723062723,
+    "elevation_m": -3631.271484375,
+    "mean_local_slope_deg_5x5": 0.9822778063262361,
+    "max_local_slope_deg_5x5": 2.235114176687618,
+    "distance_to_target_m": 79.31088220806105,
+    "classification": "Coordinate selected by derived low-slope ranking on measured DTM; base itself is Simulated"
+  },
+  "target": {
+    "name": "Sol 4621 boxwork-reference science-target candidate",
+    "row": 100,
+    "column": 100,
+    "latitude": -4.805416414533008,
+    "longitude_east": 137.37950662383716,
+    "elevation_m": -3622.488525390625,
+    "distance_from_base_m": 79.31088220806105,
+    "classification": "Assumed candidate tied to supplied waypoint; exact ridge/formation at this coordinate not confirmed"
+  },
+  "source_products": [
+    {
+      "product_id": "DTEEC_009149_1750_009294_1750_U01",
+      "type": "HiRISE stereo DTM",
+      "organization": "University of Arizona / USGS Astrogeology",
+      "url": "https://www.uahirise.org/dtm/dtm.php?ID=PSP_009149_1750",
+      "direct_data": "https://www.uahirise.org/PDS/DTM/PSP/ORB_009100_009199/PSP_009149_1750_PSP_009294_1750/DTEEC_009149_1750_009294_1750_U01.IMG",
+      "spatial_resolution_m": 1.0117467945795,
+      "format": "PDS3 IMG; 32-bit IEEE PC_REAL; little-endian; OFFSET 0; SCALING_FACTOR 1; elevation values meters",
+      "nodata": "MISSING_CONSTANT=16#FF7FFFFB#",
+      "vertical_datum": "Mars 2000 equipotential surface",
+      "classification": "Measured"
+    },
+    {
+      "product_id": "PSP_009149_1750_RED_A_01_ORTHO",
+      "type": "HiRISE orthorectified red-band image",
+      "organization": "University of Arizona / HiRISE",
+      "label_url": "https://www.uahirise.org/PDS/DTM/PSP/ORB_009100_009199/PSP_009149_1750_PSP_009294_1750/PSP_009149_1750_RED_A_01_ORTHO.LBL",
+      "spatial_resolution_m": 0.2529366986449,
+      "format": "JP2 with PDS3 detached label",
+      "nodata": "CORE_NULL=0",
+      "classification": "Measured metadata only; ortho pixels were not resampled into this grid"
+    }
+  ],
+  "fields": {
+    "measured": [
+      "elevation_m"
+    ],
+    "derived": [
+      "roughness_m_5x5_sd: standard deviation of 5x5 DTM elevations",
+      "base candidate ranking by 5x5 finite-difference slope",
+      "longitude_deg_east and latitude_deg_planetocentric from DTM map projection and pixel indices",
+      "valid from DTM missing-value and valid-range checks"
+    ],
+    "assumed": [
+      "target is a science-target candidate associated with the supplied Sol 4621 waypoint",
+      "simulation area centered on Sol 4621 waypoint"
+    ],
+    "simulated": [
+      "Gale Base designation",
+      "slip_risk_0_1 fixed 0.2 demo default",
+      "blocked fixed false placeholder; not an obstacle clearance assessment"
+    ]
+  },
+  "notes": [
+    "All 40,401 cells in crop contain valid DTM elevation pixels.",
+    "Base and target cells both valid and within the same continuous 201x201 crop.",
+    "DTM and ortho labels share Equirectangular projection, planetocentric latitude, east-positive longitude, same nominal geographic bounds; ortho resolution differs, no resampling performed.",
+    "Base is lowest 5x5 mean-slope candidate among cells 79–81 m from target waypoint; low slope is derived, not a guarantee of rover safety.",
+    "Science-target geology at the exact target cell is not classified; it is a waypoint-linked candidate only.",
+    "Crop is an educational rover-routing input, not flight-qualified terrain data or a guaranteed safe route."
+  ]
+}

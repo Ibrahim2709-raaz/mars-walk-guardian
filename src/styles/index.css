@@ -1,0 +1,160 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-mars-dark: #07090e;
+  --color-mars-panel: rgba(14, 19, 29, 0.88);
+  --color-mars-border: rgba(224, 90, 54, 0.28);
+  --color-mars-border-active: rgba(224, 90, 54, 0.7);
+  --color-mars-orange: #ff5e36;
+  --color-mars-cyan: #00e5ff;
+  --color-mars-amber: #f59e0b;
+  --color-mars-red: #ef4444;
+  --color-mars-green: #10b981;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--color-mars-dark);
+  color: #e2e8f0;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+  user-select: none;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.font-aerospace {
+  font-family: 'Chakra Petch', sans-serif;
+}
+
+/* Glassmorphism Tactical Panels */
+.tactical-panel {
+  background: var(--color-mars-panel);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--color-mars-border);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5), inset 0 0 12px rgba(224, 90, 54, 0.04);
+}
+
+.tactical-panel-alert {
+  background: rgba(35, 12, 14, 0.92);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(239, 68, 68, 0.6);
+  box-shadow: 0 0 24px rgba(239, 68, 68, 0.25), inset 0 0 16px rgba(239, 68, 68, 0.1);
+}
+
+/* Glowing Neon Elements */
+.glow-cyan {
+  text-shadow: 0 0 12px rgba(0, 229, 255, 0.6);
+}
+
+.glow-orange {
+  text-shadow: 0 0 12px rgba(255, 94, 54, 0.6);
+}
+
+.glow-red {
+  text-shadow: 0 0 14px rgba(239, 68, 68, 0.8);
+}
+
+/* Simulated Badge Tag */
+.badge-simulated {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Pulse Animations */
+@keyframes beaconPulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(224, 90, 54, 0.7);
+  }
+  70% {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 14px rgba(224, 90, 54, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(224, 90, 54, 0);
+  }
+}
+
+@keyframes emergencyFlash {
+  0%, 100% {
+    opacity: 1;
+    border-color: rgba(239, 68, 68, 0.8);
+  }
+  50% {
+    opacity: 0.45;
+    border-color: rgba(239, 68, 68, 0.2);
+  }
+}
+
+.beacon-pulse {
+  animation: beaconPulse 2s infinite;
+}
+
+.emergency-flash {
+  animation: emergencyFlash 1.2s infinite;
+}
+
+/* MapLibre Canvas Customization */
+.maplibregl-canvas-container {
+  width: 100%;
+  height: 100%;
+}
+
+.maplibregl-ctrl-bottom-right,
+.maplibregl-ctrl-bottom-left {
+  z-index: 10 !important;
+}
+
+/* Custom Marker Styling */
+.mars-marker {
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.mars-marker:hover {
+  transform: scale(1.25) translateY(-4px);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(224, 90, 54, 0.35);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(224, 90, 54, 0.65);
+}
