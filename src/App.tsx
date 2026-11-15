@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { EmergencyControl } from './components/EmergencyControl';
 import { Header, ViewMode } from './components/Header';
 import { LayerControls } from './components/LayerControls';
@@ -92,6 +92,9 @@ export const App: React.FC = () => {
   const [routingError, setRoutingError] = useState<string | null>(null);
   const [blockedHazardCells, setBlockedHazardCells] = useState<{ row: number; column: number }[] | null>(null);
 
+  const batteryRef = useRef(100);
+  batteryRef.current = telemetry.batteryRemainingWh;
+
   const calculateRouteForTarget = useCallback(
     async (target: TargetDestinationInfo, emergency: boolean) => {
       setIsRouting(true);
@@ -104,9 +107,14 @@ export const App: React.FC = () => {
       try {
         if (!emergency) {
           if (isLocalGale) {
-            const targetCell = lngLatToCell(target.coordinates[0], target.coordinates[1]);
+            let targetCell = lngLatToCell(target.coordinates[0], target.coordinates[1]);
+            let startCell = BASE_POSITION;
+            if (targetCell.row === BASE_POSITION.row && targetCell.column === BASE_POSITION.column) {
+              startCell = SCIENCE_TARGET_POSITION;
+              targetCell = BASE_POSITION;
+            }
             const result = await calculateTerrainRoute({
-              start: BASE_POSITION,
+              start: startCell,
               target: targetCell,
               rover_state: {
                 battery_wh: 100,
@@ -119,7 +127,7 @@ export const App: React.FC = () => {
             setNormalRoute(routeResultToRouteData(result, 'normal'));
             setPlanetaryCalculation(null);
           } else {
-            const plan = calculatePlanetaryRoute(CURRENT_ROVER_COORDINATES, target, telemetry.batteryRemainingWh);
+            const plan = calculatePlanetaryRoute(CURRENT_ROVER_COORDINATES, target, batteryRef.current);
             setNormalRoute(plan.routeData);
             setPlanetaryCalculation(plan.calculation);
             setNormalRouteResult(null);
@@ -130,7 +138,10 @@ export const App: React.FC = () => {
         } else {
           // Emergency Contingency Route
           if (isLocalGale) {
-            const targetCell = lngLatToCell(target.coordinates[0], target.coordinates[1]);
+            let startCell = lngLatToCell(target.coordinates[0], target.coordinates[1]);
+            if (startCell.row === BASE_POSITION.row && startCell.column === BASE_POSITION.column) {
+              startCell = SCIENCE_TARGET_POSITION;
+            }
             const blockedCells: { row: number; column: number }[] = [];
             for (let row = 62; row <= 72; row++) {
               for (let col = 115; col <= 135; col++) {
@@ -138,7 +149,7 @@ export const App: React.FC = () => {
               }
             }
             const result = await calculateTerrainRoute({
-              start: targetCell,
+              start: startCell,
               target: BASE_POSITION,
               rover_state: {
                 battery_wh: 65,
@@ -153,7 +164,7 @@ export const App: React.FC = () => {
             setBlockedHazardCells(blockedCells);
             setPlanetaryCalculation(null);
           } else {
-            const plan = calculatePlanetaryEmergencyRoute(CURRENT_ROVER_COORDINATES, target, telemetry.batteryRemainingWh);
+            const plan = calculatePlanetaryEmergencyRoute(CURRENT_ROVER_COORDINATES, target, batteryRef.current);
             setEmergencyRoute(plan.routeData);
             setPlanetaryCalculation(plan.calculation);
             setEmergencyRouteResult(null);
@@ -163,12 +174,12 @@ export const App: React.FC = () => {
       } catch (error) {
         // Fallback for offline local service or grid limits
         if (!emergency) {
-          const plan = calculatePlanetaryRoute(CURRENT_ROVER_COORDINATES, target, telemetry.batteryRemainingWh);
+          const plan = calculatePlanetaryRoute(CURRENT_ROVER_COORDINATES, target, batteryRef.current);
           setNormalRoute(plan.routeData);
           setPlanetaryCalculation(plan.calculation);
           setNormalRouteResult(null);
         } else {
-          const plan = calculatePlanetaryEmergencyRoute(CURRENT_ROVER_COORDINATES, target, telemetry.batteryRemainingWh);
+          const plan = calculatePlanetaryEmergencyRoute(CURRENT_ROVER_COORDINATES, target, batteryRef.current);
           setEmergencyRoute(plan.routeData);
           setPlanetaryCalculation(plan.calculation);
           setEmergencyRouteResult(null);
@@ -180,7 +191,7 @@ export const App: React.FC = () => {
         setIsRouting(false);
       }
     },
-    [telemetry.batteryRemainingWh]
+    []
   );
 
   useEffect(() => {
@@ -199,18 +210,17 @@ export const App: React.FC = () => {
   );
 
   const handleToggleEmergency = async () => {
-    if (isEmergency) {
-      setIsEmergency(false);
+    const nextEmergency = !isEmergency;
+    setIsEmergency(nextEmergency);
+    if (!nextEmergency) {
       setTelemetry(NOMINAL_ROVER_TELEMETRY);
       setRoutingError(null);
       setBlockedHazardCells(null);
       await calculateRouteForTarget(currentTarget, false);
-      return;
+    } else {
+      setTelemetry(EMERGENCY_ROVER_TELEMETRY);
+      await calculateRouteForTarget(currentTarget, true);
     }
-
-    setIsEmergency(true);
-    setTelemetry(EMERGENCY_ROVER_TELEMETRY);
-    await calculateRouteForTarget(currentTarget, true);
   };
 
   useEffect(() => {
