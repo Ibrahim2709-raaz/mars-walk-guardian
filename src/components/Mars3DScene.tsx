@@ -124,6 +124,7 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
   const emergencyRouteRef = useRef(emergencyRoute);
   emergencyRouteRef.current = emergencyRoute;
   const lastFocusedCoordRef = useRef<string | null>(null);
+  const initialFocusDoneRef = useRef(false);
 
   // Initialize ArcGIS 3D SceneView
   useEffect(() => {
@@ -140,14 +141,14 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
     // 2. Configure Mars 2000 Basemap Imagery
     const marsImagery = new TileLayer({
       id: 'marsImagery',
-      portalItem: { id: '1efb16809db84f0c892b9b0662dab0c8' },
+      url: 'https://astro.arcgis.com/arcgis/rest/services/OnMars/MDIM/MapServer',
       title: 'Mars Global Color Imagery',
       copyright: 'USGS Astrogeology Science Center, NASA, JPL, Esri'
     });
 
     const marsHiRise = new TileLayer({
       id: 'marsHiRise',
-      portalItem: { id: 'c1c4c750a2154842ae523c984cc14fa5' },
+      url: 'https://astro.arcgis.com/arcgis/rest/services/OnMars/HiRISE/MapServer',
       title: 'Mars HiRISE High-Resolution Surface Imagery',
       visible: true
     });
@@ -196,14 +197,14 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
         }
       },
       camera: {
-        position: {
-          x: 137.38017,
-          y: -4.85,
-          z: 38000,
+        position: new Point({
+          x: 137.37984,
+          y: -4.8070,
+          z: -3440,
           spatialReference: marsSpatialReference
-        },
-        heading: 350,
-        tilt: 62
+        }),
+        heading: 355,
+        tilt: 58
       },
       popupEnabled: false,
       ui: { components: ['compass', 'navigation-toggle'] }
@@ -820,25 +821,30 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
     const view = viewRef.current;
     if (!view) return;
 
-    const midLng = (GALE_BASE_COORDINATES[0] + BOXWORK_TARGET_COORDINATES[0]) / 2;
-    const midLat = (GALE_BASE_COORDINATES[1] + BOXWORK_TARGET_COORDINATES[1]) / 2;
-    const midPoint = new Point({ x: midLng, y: midLat, spatialReference: marsSpatialReference });
-    const cameraPosition = new Point({
-      x: midLng,
-      y: midLat - 0.0028,
-      z: -3460,
-      spatialReference: marsSpatialReference
+    const missionCamera = new Camera({
+      position: new Point({
+        x: 137.37984,
+        y: -4.8070,
+        z: -3440,
+        spatialReference: marsSpatialReference
+      }),
+      heading: 355,
+      tilt: 58
     });
 
-    void view.goTo(
-      new Camera({
-        position: cameraPosition,
-        heading: 0,
-        tilt: 46
-      }),
-      { duration: 1600, easing: 'in-out-cubic' as any }
-    );
+    await view.goTo(missionCamera, { duration: 1800, easing: 'in-out-cubic' as any });
   }, []);
+
+  // Auto-focus on the mission route on initial load once normalRoute is available
+  useEffect(() => {
+    if (normalRoute && normalRoute.coordinates.length >= 2 && !initialFocusDoneRef.current) {
+      initialFocusDoneRef.current = true;
+      const timer = setTimeout(() => {
+        void focusGaleMissionRoute();
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [normalRoute, focusGaleMissionRoute]);
 
   // Respond to prop mode changes (e.g. Header button click)
   useEffect(() => {
@@ -1084,38 +1090,31 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
       const isGale = Math.abs(targetLng - 137.38) < 0.5 && Math.abs(targetLat - -4.805) < 0.5;
 
       if (isGale) {
-        // Position camera to look directly at targetPoint from ~46° tilt looking North
-        const cameraPosition = new Point({
-          x: targetLng,
-          y: targetLat - 0.00262,
-          z: -3470,
-          spatialReference: marsSpatialReference
+        const targetCamera = new Camera({
+          position: new Point({
+            x: targetLng,
+            y: targetLat - 0.002,
+            z: -3440,
+            spatialReference: marsSpatialReference
+          }),
+          heading: 350,
+          tilt: 58
         });
 
-        void view.goTo(
-          new Camera({
-            position: cameraPosition,
-            heading: 0,
-            tilt: 46
-          }),
-          { duration: 1400, easing: 'in-out-cubic' as any }
-        );
+        void view.goTo(targetCamera, { duration: 1600, easing: 'in-out-cubic' as any });
       } else {
-        const cameraPosition = new Point({
-          x: targetLng,
-          y: targetLat - 0.04,
-          z: 35000,
-          spatialReference: marsSpatialReference
+        const targetCamera = new Camera({
+          position: new Point({
+            x: targetLng,
+            y: targetLat - 0.04,
+            z: 25000,
+            spatialReference: marsSpatialReference
+          }),
+          heading: 350,
+          tilt: 45
         });
 
-        void view.goTo(
-          new Camera({
-            position: cameraPosition,
-            heading: 0,
-            tilt: 46
-          }),
-          { duration: 1800, easing: 'in-out-cubic' as any }
-        );
+        void view.goTo(targetCamera, { duration: 2000, easing: 'in-out-cubic' as any });
       }
     }
 
