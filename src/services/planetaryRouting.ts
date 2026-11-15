@@ -102,7 +102,7 @@ export interface TargetDestinationInfo {
 function getTerrainStationProfile(
   fraction: number,
   targetName: string,
-  startElev: number,
+  _startElev: number,
   targetElev: number
 ): { name: string; terrainType: string; hazard: 'LOW' | 'MEDIUM' | 'HIGH'; slope: number; desc: string } {
   const isHighland = targetElev > 0;
@@ -304,7 +304,6 @@ export function calculatePlanetaryEmergencyRoute(
   calculation: RouteCalculationResult;
   blockedCoordinates?: LatLng[];
 } {
-  const normalDistanceM = calculateMarsGeodesicDistance(startCoordinates, target.coordinates);
   const denseCoordinates = interpolateGreatCircle(startCoordinates, target.coordinates, 60);
 
   // Egress point: halfway or 35% along the path where simulated fault occurs
