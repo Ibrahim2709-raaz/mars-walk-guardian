@@ -9,7 +9,7 @@ interface LayerControlsProps {
 
 export const LayerControls: React.FC<LayerControlsProps> = ({ layers, onToggleLayer }) => {
   return (
-    <div className="tactical-panel rounded-xl p-3 border-orange-500/20 text-xs select-none">
+    <div className="layer-controls tactical-panel rounded-xl p-3 border-orange-500/20 text-xs select-none">
       <div className="flex flex-wrap items-center justify-between pb-2 mb-2 border-b border-slate-800 gap-2">
         <div className="flex items-center gap-2">
           <span className="font-aerospace font-bold text-slate-200 tracking-wider flex items-center gap-1.5">
@@ -27,11 +27,11 @@ export const LayerControls: React.FC<LayerControlsProps> = ({ layers, onToggleLa
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="layer-control-grid grid grid-cols-2 sm:grid-cols-4 gap-2">
         {/* Optical Toggle (NASA-Derived) */}
         <button
           onClick={() => onToggleLayer('optical')}
-          className={`flex items-center justify-between p-2 rounded-lg border transition-all text-left cursor-pointer ${
+          className={`layer-control-button flex min-w-0 items-center justify-between p-2 rounded-lg border transition-all text-left cursor-pointer ${
             layers.optical
               ? 'bg-slate-900 border-orange-500/50 text-orange-300 shadow-sm shadow-orange-500/10'
               : 'bg-slate-950/60 border-slate-800 text-slate-500 hover:border-slate-700'
@@ -46,7 +46,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({ layers, onToggleLa
                   NASA
                 </span>
               </div>
-              <div className="text-[10px] font-mono text-slate-400">NASA/USGS Basemap</div>
+              <div className="layer-control-description text-[10px] font-mono text-slate-400">NASA/USGS Basemap</div>
             </div>
           </div>
           <span
@@ -59,7 +59,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({ layers, onToggleLa
         {/* Slope Toggle (Simulated Mock Data) */}
         <button
           onClick={() => onToggleLayer('slope')}
-          className={`flex items-center justify-between p-2 rounded-lg border transition-all text-left cursor-pointer ${
+          className={`layer-control-button flex min-w-0 items-center justify-between p-2 rounded-lg border transition-all text-left cursor-pointer ${
             layers.slope
               ? 'bg-slate-900 border-emerald-500/50 text-emerald-300 shadow-sm shadow-emerald-500/10'
               : 'bg-slate-950/60 border-slate-800 text-slate-500 hover:border-slate-700'
@@ -74,7 +74,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({ layers, onToggleLa
                   SIMULATED
                 </span>
               </div>
-              <div className="text-[10px] font-mono text-slate-400">&lt;5° to &gt;15° (Mock Data)</div>
+              <div className="layer-control-description text-[10px] font-mono text-slate-400">&lt;5° to &gt;15° (Mock Data)</div>
             </div>
           </div>
           <span
@@ -87,7 +87,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({ layers, onToggleLa
         {/* Hazard Toggle (Simulated Mock Data) */}
         <button
           onClick={() => onToggleLayer('hazard')}
-          className={`flex items-center justify-between p-2 rounded-lg border transition-all text-left cursor-pointer ${
+          className={`layer-control-button flex min-w-0 items-center justify-between p-2 rounded-lg border transition-all text-left cursor-pointer ${
             layers.hazard
               ? 'bg-slate-900 border-red-500/50 text-red-300 shadow-sm shadow-red-500/10'
               : 'bg-slate-950/60 border-slate-800 text-slate-500 hover:border-slate-700'
@@ -102,7 +102,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({ layers, onToggleLa
                   SIMULATED
                 </span>
               </div>
-              <div className="text-[10px] font-mono text-slate-400">Slip &amp; Clasts (Mock Data)</div>
+              <div className="layer-control-description text-[10px] font-mono text-slate-400">Slip &amp; Clasts (Mock Data)</div>
             </div>
           </div>
           <span
@@ -115,7 +115,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({ layers, onToggleLa
         {/* Mineral Toggle (Simulated Mock Data) */}
         <button
           onClick={() => onToggleLayer('mineral')}
-          className={`flex items-center justify-between p-2 rounded-lg border transition-all text-left cursor-pointer ${
+          className={`layer-control-button flex min-w-0 items-center justify-between p-2 rounded-lg border transition-all text-left cursor-pointer ${
             layers.mineral
               ? 'bg-slate-900 border-purple-500/50 text-purple-300 shadow-sm shadow-purple-500/10'
               : 'bg-slate-950/60 border-slate-800 text-slate-500 hover:border-slate-700'
@@ -130,7 +130,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({ layers, onToggleLa
                   SIMULATED
                 </span>
               </div>
-              <div className="text-[10px] font-mono text-slate-400">CRISM Mock Data</div>
+              <div className="layer-control-description text-[10px] font-mono text-slate-400">CRISM Mock Data</div>
             </div>
           </div>
           <span

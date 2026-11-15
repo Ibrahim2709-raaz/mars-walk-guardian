@@ -44,10 +44,10 @@ export const RouteExplanation: React.FC<RouteExplanationProps> = ({
           <Route className={`w-4 h-4 ${isEmergency ? 'text-red-400' : 'text-cyan-400'}`} />
           <span className="font-aerospace font-bold text-slate-100 tracking-wider">
             {isEmergency
-              ? 'CONTINGENCY RECOVERY PROFILE'
-              : 'ROBOTIC ROVER TRAVERSE PROFILE'}
+              ? 'Emergency return route'
+              : 'Why this route?'}
           </span>
-          <span className="badge-system text-[9px]">[SYSTEM-DERIVED]</span>
+          <span className="badge-system text-[9px]">Derived</span>
           <span
             className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
               routeCalculation.feasible
@@ -55,7 +55,7 @@ export const RouteExplanation: React.FC<RouteExplanationProps> = ({
                 : 'bg-red-500/20 text-red-400 border border-red-500/30'
             }`}
           >
-            {routeCalculation.feasible ? 'TRAVERSE FEASIBLE' : 'TRAVERSE UNFEASIBLE'}
+            {routeCalculation.feasible ? 'FEASIBLE' : 'NOT READY'}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -71,7 +71,7 @@ export const RouteExplanation: React.FC<RouteExplanationProps> = ({
       </div>
 
       {isExpanded && (
-        <div className="p-3.5 space-y-3 max-h-96 overflow-y-auto">
+        <div className="p-3.5 space-y-3 overflow-y-auto">
           {/* Output Cards from calculateRoute(...) */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {/* distanceM */}

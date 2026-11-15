@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import { ShieldAlert, RotateCcw, AlertTriangle, ArrowRight, Activity } from 'lucide-react';
+import { ShieldAlert, RotateCcw, AlertTriangle, Activity } from 'lucide-react';
 
 interface EmergencyControlProps {
   isEmergency: boolean;
@@ -16,13 +16,13 @@ export const EmergencyControl: React.FC<EmergencyControlProps> = ({
 }) => {
   return (
     <div
-      className={`rounded-xl p-3 md:p-4 border transition-all duration-300 select-none ${
+      className={`mission-control-card rounded-xl border transition-all duration-300 select-none ${
         isEmergency
           ? 'tactical-panel-alert'
           : 'tactical-panel border-orange-500/25'
       }`}
     >
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <div className="flex items-start gap-2.5">
           <div
             className={`p-2 rounded-lg ${
@@ -38,18 +38,18 @@ export const EmergencyControl: React.FC<EmergencyControlProps> = ({
             )}
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-aerospace font-bold text-sm tracking-wide text-slate-100">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="font-aerospace font-semibold text-sm tracking-wide text-slate-100">
                 {isEmergency
-                  ? 'SIMULATED ROVER FAULT RETURN'
-                  : 'SIMULATED EMERGENCY STATE CONTROL'}
+                  ? 'Emergency return active'
+                  : 'Emergency route test'}
               </h3>
-              <span className="badge-simulated text-[9px]">[SIMULATED STATE]</span>
+              <span className="badge-simulated text-[9px]">Simulated</span>
             </div>
-            <p className="text-xs text-slate-400 font-mono mt-0.5 max-w-xl">
+            <p className="text-[11px] leading-relaxed text-slate-400 mt-0.5 max-w-xl">
               {isEmergency
-                ? 'Python weighted A* calculated a feasible return route around the simulated hazard zone (rows 62–72, cols 115–135).'
-                : 'Inject a simulated rectangular hazard zone and request a live return route from the Python service.'}
+                ? 'A* recalculated the return around the injected hazard.'
+                : 'Block part of the route and calculate a safe return.'}
             </p>
             {error && <p className="text-xs text-red-400 font-mono mt-1">{error}</p>}
           </div>
@@ -59,7 +59,7 @@ export const EmergencyControl: React.FC<EmergencyControlProps> = ({
         <button
           onClick={onToggleEmergency}
           disabled={isRouting}
-          className={`w-full sm:w-auto px-5 py-2.5 rounded-lg font-aerospace font-bold text-xs tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shrink-0 ${
+          className={`mission-control-action px-3 py-2 rounded-lg font-aerospace font-semibold text-[11px] transition-all cursor-pointer flex items-center justify-center gap-2 shrink-0 ${
             isEmergency
               ? 'bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 shadow-slate-950/60'
               : 'bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white border border-red-400/50 shadow-red-950/60 emergency-flash'
@@ -70,13 +70,12 @@ export const EmergencyControl: React.FC<EmergencyControlProps> = ({
           ) : isEmergency ? (
             <>
               <RotateCcw className="w-4 h-4 text-cyan-400" />
-              <span>RESET TO NOMINAL ROUTE</span>
+              <span>Reset route</span>
             </>
           ) : (
             <>
               <Activity className="w-4 h-4 text-white animate-pulse" />
-              <span>SIMULATE EMERGENCY STATE</span>
-              <ArrowRight className="w-3.5 h-3.5 text-red-200" />
+              <span>Simulate fault</span>
             </>
           )}
         </button>

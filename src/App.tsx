@@ -65,6 +65,8 @@ const EMPTY_CALCULATION: RouteCalculationResult = {
   feasible: false
 };
 
+type PanelMode = 'route' | 'telemetry';
+
 function routeResultToRouteData(result: RouteResult, type: 'normal' | 'emergency'): RouteData {
   const coordinates = result.path.map((cell): LatLng => [cell.longitude, cell.latitude]);
   let elevationGainMeters = 0;
@@ -136,7 +138,8 @@ function routeResultToCalculation(result: RouteResult): RouteCalculationResult {
 
 export const App: React.FC = () => {
   const [isEmergency, setIsEmergency] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('3d-orbital');
+  const [viewMode, setViewMode] = useState<ViewMode>('2d-grid');
+  const [panelMode, setPanelMode] = useState<PanelMode>('route');
   const [isDropModeActive, setIsDropModeActive] = useState<boolean>(false);
   const [isBookmarksOpen, setIsBookmarksOpen] = useState<boolean>(false);
   const [selectedBookmark, setSelectedBookmark] = useState<MarsBookmark | null>(null);
@@ -193,6 +196,7 @@ export const App: React.FC = () => {
   }, []);
 
   const handleToggleEmergency = async () => {
+    setPanelMode('route');
     if (isEmergency) {
       setIsEmergency(false);
       setTelemetry(NOMINAL_ROVER_TELEMETRY);
@@ -268,7 +272,7 @@ export const App: React.FC = () => {
     : { ...EMPTY_CALCULATION, warnings: routingError ? [routingError] : EMPTY_CALCULATION.warnings };
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 font-sans">
+    <div className="app-shell">
       <Header
         telemetry={telemetry}
         isEmergency={isEmergency}
@@ -287,13 +291,9 @@ export const App: React.FC = () => {
         }}
       />
 
-      <main
-        className="flex-1 p-2 md:p-4 grid grid-cols-1 lg:grid-cols-12 gap-3 overflow-y-auto lg:overflow-hidden relative"
-        style={{ minHeight: 0 }}
-      >
-        {/* Left / Center Map & 3D Scene View (8 Columns on desktop) */}
-        <section className="lg:col-span-8 flex flex-col gap-3 relative" style={{ minHeight: '540px', height: '100%' }}>
-          <div className="relative rounded-xl overflow-hidden" style={{ flex: '1 1 0', minHeight: '480px' }}>
+      <main className="mission-grid">
+        <section className="mission-workspace" aria-label="Mars mission map and terrain views">
+          <div className="mission-viewport">
             {viewMode === '3d-rover' ? (
               <RoverModuleBoundary>
                 <Suspense fallback={<div role="status" className="grid h-full place-items-center bg-slate-900 text-sm text-slate-200">Loading 3D Rover…</div>}>
@@ -371,21 +371,57 @@ export const App: React.FC = () => {
           )}
         </section>
 
-        {/* Right Tactical Mission Sidebar (4 Columns on desktop) */}
-        <aside className="lg:col-span-4 flex flex-col gap-3 overflow-y-auto pr-0.5">
+        <aside className="mission-sidebar" aria-label="Mission decision panel">
+          <div className="mission-sidebar__summary">
+            <div>
+              <span className="mission-eyebrow">Mission decision</span>
+              <h2>{isEmergency ? 'Contingency return' : 'Science traverse'}</h2>
+            </div>
+            <span className={`mission-feasibility ${routeCalculation.feasible ? 'is-feasible' : ''}`}>
+              {isRouting ? 'Routing…' : routeCalculation.feasible ? 'Feasible' : 'Standby'}
+            </span>
+          </div>
+
           <EmergencyControl
             isEmergency={isEmergency}
             isRouting={isRouting}
             error={routingError}
             onToggleEmergency={handleToggleEmergency}
           />
-          <TelemetryHUD telemetry={telemetry} isEmergency={isEmergency} />
-          <RouteExplanation
-            activeRoute={activeRoute}
-            routeCalculation={routeCalculation}
-            isEmergency={isEmergency}
-            onSelectWaypoint={setFocusedCoordinates}
-          />
+
+          <div className="mission-panel-tabs" role="tablist" aria-label="Mission information">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={panelMode === 'route'}
+              className={panelMode === 'route' ? 'is-active' : ''}
+              onClick={() => setPanelMode('route')}
+            >
+              Route decision
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={panelMode === 'telemetry'}
+              className={panelMode === 'telemetry' ? 'is-active' : ''}
+              onClick={() => setPanelMode('telemetry')}
+            >
+              Rover telemetry
+            </button>
+          </div>
+
+          <div className="mission-panel-content">
+            {panelMode === 'route' ? (
+              <RouteExplanation
+                activeRoute={activeRoute}
+                routeCalculation={routeCalculation}
+                isEmergency={isEmergency}
+                onSelectWaypoint={setFocusedCoordinates}
+              />
+            ) : (
+              <TelemetryHUD telemetry={telemetry} isEmergency={isEmergency} />
+            )}
+          </div>
         </aside>
       </main>
     </div>
