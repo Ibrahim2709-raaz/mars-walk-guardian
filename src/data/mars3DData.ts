@@ -31,19 +31,6 @@ export interface MarsBookmark {
 
 export const MARS_BOOKMARKS: MarsBookmark[] = [
   {
-    id: 'gale-mission-route',
-    name: 'Gale Mission Traverse (86m Route)',
-    category: 'base',
-    description: 'Close-up 3D view of the 86m rover traverse and simulated obstacle corridor in Gale Crater.',
-    coordinates: [137.37984, -4.80484],
-    camera: {
-      position: { x: 137.37984, y: -4.8070, z: -3440 }, // ~190 m above -3631m terrain floor
-      heading: 355,
-      tilt: 58
-    },
-    groundElevationApproxM: -3628
-  },
-  {
     id: 'gale-base',
     name: 'Gale Rover Base Alpha',
     category: 'base',
