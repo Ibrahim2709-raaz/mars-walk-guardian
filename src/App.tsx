@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { EmergencyControl } from './components/EmergencyControl';
 import { Header, ViewMode } from './components/Header';
 import { LayerControls } from './components/LayerControls';
@@ -24,6 +24,20 @@ import {
   RoverTelemetry,
   Waypoint
 } from './types';
+
+const RoverView = lazy(() => import('./components/rover/RoverView'));
+
+class RoverModuleBoundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  render() {
+    return this.state.failed
+      ? <div role="alert" className="grid h-full place-items-center bg-slate-900 px-6 text-center text-sm text-slate-200">
+          Unable to load the 3D Rover view. Reload to retry or select another view.
+        </div>
+      : this.props.children;
+  }
+}
 
 const EMPTY_ROUTE: RouteData = {
   id: 'route-loading',
@@ -280,7 +294,20 @@ export const App: React.FC = () => {
         {/* Left / Center Map & 3D Scene View (8 Columns on desktop) */}
         <section className="lg:col-span-8 flex flex-col gap-3 relative" style={{ minHeight: '540px', height: '100%' }}>
           <div className="relative rounded-xl overflow-hidden" style={{ flex: '1 1 0', minHeight: '480px' }}>
-            {viewMode === '2d-grid' ? (
+            {viewMode === '3d-rover' ? (
+              <RoverModuleBoundary>
+                <Suspense fallback={<div role="status" className="grid h-full place-items-center bg-slate-900 text-sm text-slate-200">Loading 3D Rover…</div>}>
+                  <RoverView
+                    result={activeResult}
+                    isEmergency={isEmergency}
+                    isRouting={isRouting}
+                    routingError={routingError}
+                    telemetry={telemetry}
+                    onReset={() => { if (isEmergency) void handleToggleEmergency(); }}
+                  />
+                </Suspense>
+              </RoverModuleBoundary>
+            ) : viewMode === '2d-grid' ? (
               <MarsMap
                 layers={layers}
                 isEmergency={isEmergency}
@@ -311,7 +338,7 @@ export const App: React.FC = () => {
             )}
 
             {/* Bookmarks Drawer Overlay */}
-            {isBookmarksOpen && viewMode !== '2d-grid' && (
+            {isBookmarksOpen && (viewMode === '3d-orbital' || viewMode === '3d-surface') && (
               <div className="absolute top-3 left-3 z-30 animate-in fade-in slide-in-from-left-4 duration-200">
                 <OrbitalBookmarks
                   onFlyTo={(bm) => {
