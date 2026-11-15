@@ -12,6 +12,7 @@ import {
   FileCode2
 } from 'lucide-react';
 import { RouteData, Waypoint, LatLng, RouteCalculationResult } from '../types';
+import { BASE_POSITION, SCIENCE_TARGET_POSITION, TERRAIN_CELL_SIZE_M } from '../data/terrainSites';
 
 interface RouteExplanationProps {
   activeRoute: RouteData;
@@ -27,7 +28,15 @@ export const RouteExplanation: React.FC<RouteExplanationProps> = ({
   onSelectWaypoint
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(true);
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState<boolean>(false);
   const [selectedWaypointId, setSelectedWaypointId] = useState<string | null>(null);
+  const directDistanceM = Math.hypot(
+    SCIENCE_TARGET_POSITION.row - BASE_POSITION.row,
+    SCIENCE_TARGET_POSITION.column - BASE_POSITION.column
+  ) * TERRAIN_CELL_SIZE_M;
+  const distanceDeltaPercent = directDistanceM > 0
+    ? ((routeCalculation.distanceM - directDistanceM) / directDistanceM) * 100
+    : 0;
 
   return (
     <div
@@ -130,6 +139,30 @@ export const RouteExplanation: React.FC<RouteExplanationProps> = ({
             </div>
           </div>
 
+          {!isEmergency && routeCalculation.feasible && (
+            <section className="route-comparison" aria-label="Route comparison">
+              <div className="route-comparison__heading">
+                <div>
+                  <span>Why Guardian chose this path</span>
+                  <p>The shortest geometric line is a reference only; it has not been terrain screened.</p>
+                </div>
+                <strong>+{Math.max(0, distanceDeltaPercent).toFixed(1)}% distance</strong>
+              </div>
+              <div className="route-comparison__grid">
+                <div>
+                  <span>Direct-line minimum</span>
+                  <strong>{directDistanceM.toFixed(1)} m</strong>
+                  <small>Risk: not evaluated</small>
+                </div>
+                <div className="is-selected">
+                  <span>Guardian terrain route</span>
+                  <strong>{routeCalculation.distanceM.toFixed(1)} m</strong>
+                  <small>Risk: {(routeCalculation.riskScore * 100).toFixed(0)}% · terrain screened</small>
+                </div>
+              </div>
+            </section>
+          )}
+
           {/* Warnings Display from calculateRoute(...) */}
           {routeCalculation.warnings && routeCalculation.warnings.length > 0 && (
             <div className="space-y-1.5">
@@ -150,7 +183,17 @@ export const RouteExplanation: React.FC<RouteExplanationProps> = ({
             </div>
           )}
 
-          {/* Interface signature & backend connection notice */}
+          <button
+            type="button"
+            className="technical-details-toggle"
+            onClick={() => setShowTechnicalDetails((previous) => !previous)}
+            aria-expanded={showTechnicalDetails}
+          >
+            <span><FileCode2 className="h-3.5 w-3.5" /> Technical details &amp; provenance</span>
+            {showTechnicalDetails ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+
+          {showTechnicalDetails && <div className="technical-details-stack">
           <div className="p-2 rounded bg-slate-950/80 border border-slate-800 text-[10px] font-mono text-slate-400 flex items-start gap-2">
             <FileCode2 className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
             <div>
@@ -252,6 +295,7 @@ export const RouteExplanation: React.FC<RouteExplanationProps> = ({
               })}
             </div>
           </div>
+          </div>}
         </div>
       )}
     </div>

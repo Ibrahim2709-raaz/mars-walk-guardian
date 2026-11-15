@@ -185,12 +185,12 @@ export const MarsMap: React.FC<MarsMapProps> = ({
       map.addLayer({
         id: 'route-normal-glow', type: 'line', source: 'route-normal-source',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#00e5ff', 'line-width': 9, 'line-opacity': 0.45, 'line-blur': 4 }
+        paint: { 'line-color': '#00e5ff', 'line-width': 13, 'line-opacity': 0.6, 'line-blur': 5 }
       });
       map.addLayer({
         id: 'route-normal-core', type: 'line', source: 'route-normal-source',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#38bdf8', 'line-width': 3.5, 'line-opacity': 0.95 }
+        paint: { 'line-color': '#22d3ee', 'line-width': 5, 'line-opacity': 1 }
       });
 
       map.addSource('route-emergency-source', {
@@ -199,12 +199,12 @@ export const MarsMap: React.FC<MarsMapProps> = ({
       map.addLayer({
         id: 'route-emergency-glow', type: 'line', source: 'route-emergency-source',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#ef4444', 'line-width': 12, 'line-opacity': 0.2, 'line-blur': 4 }
+        paint: { 'line-color': '#ff2d55', 'line-width': 16, 'line-opacity': 0.22, 'line-blur': 5 }
       });
       map.addLayer({
         id: 'route-emergency-core', type: 'line', source: 'route-emergency-source',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#ef4444', 'line-width': 4.5, 'line-opacity': 0.4, 'line-dasharray': [3, 2] }
+        paint: { 'line-color': '#ff334f', 'line-width': 5.5, 'line-opacity': 0, 'line-dasharray': [3, 2] }
       });
 
       const showOverlayPopup = (event: MapLayerMouseEvent) => {
@@ -386,15 +386,15 @@ export const MarsMap: React.FC<MarsMapProps> = ({
       if (!map.getLayer('route-normal-core') || !map.getLayer('route-emergency-core')) return false;
 
       // Normal route: solid cyan when nominal, dim dashed cyan when in emergency
-      map.setPaintProperty('route-normal-glow', 'line-opacity', isEmergency ? 0.08 : 0.45);
-      map.setPaintProperty('route-normal-core', 'line-opacity', isEmergency ? 0.25 : 0.95);
+      map.setPaintProperty('route-normal-glow', 'line-opacity', isEmergency ? 0.08 : 0.6);
+      map.setPaintProperty('route-normal-core', 'line-opacity', isEmergency ? 0.18 : 1);
       map.setPaintProperty('route-normal-core', 'line-dasharray', isEmergency ? [2, 3] : [1]);
 
       // Emergency route: faint dashed when nominal, bold solid glowing red when in emergency
-      map.setPaintProperty('route-emergency-glow', 'line-opacity', isEmergency ? 0.85 : 0.15);
-      map.setPaintProperty('route-emergency-glow', 'line-width', isEmergency ? 14 : 4);
-      map.setPaintProperty('route-emergency-core', 'line-opacity', isEmergency ? 1.0 : 0.3);
-      map.setPaintProperty('route-emergency-core', 'line-width', isEmergency ? 5.0 : 2.0);
+      map.setPaintProperty('route-emergency-glow', 'line-opacity', isEmergency ? 0.9 : 0);
+      map.setPaintProperty('route-emergency-glow', 'line-width', isEmergency ? 18 : 1);
+      map.setPaintProperty('route-emergency-core', 'line-opacity', isEmergency ? 1 : 0);
+      map.setPaintProperty('route-emergency-core', 'line-width', isEmergency ? 6.5 : 1);
       map.setPaintProperty('route-emergency-core', 'line-dasharray', isEmergency ? [1] : [3, 2]);
 
       const coordinates = isEmergency ? emergencyRoute?.coordinates : normalRoute?.coordinates;

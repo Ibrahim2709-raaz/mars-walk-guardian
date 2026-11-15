@@ -1,9 +1,12 @@
 import React, { lazy, Suspense, useEffect, useState } from 'react';
+import { CollapsibleLayerControls } from './components/CollapsibleLayerControls';
+import { DemoGuide } from './components/DemoGuide';
 import { EmergencyControl } from './components/EmergencyControl';
 import { Header, ViewMode } from './components/Header';
 import { LayerControls } from './components/LayerControls';
 import { MarsMap } from './components/MarsMap';
 import { Mars3DScene } from './components/Mars3DScene';
+import { MapToolbar } from './components/MapToolbar';
 import { OrbitalBookmarks } from './components/OrbitalBookmarks';
 import { RouteExplanation } from './components/RouteExplanation';
 import { TelemetryHUD } from './components/TelemetryHUD';
@@ -66,6 +69,14 @@ const EMPTY_CALCULATION: RouteCalculationResult = {
 };
 
 type PanelMode = 'route' | 'telemetry';
+
+function friendlyRoutingError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/failed to fetch|network|load failed|405|not allowed/i.test(message)) {
+    return 'Routing engine is waking up. The first request can take up to 50 seconds; retrying automatically…';
+  }
+  return message || 'Python routing service is unavailable.';
+}
 
 function routeResultToRouteData(result: RouteResult, type: 'normal' | 'emergency'): RouteData {
   const coordinates = result.path.map((cell): LatLng => [cell.longitude, cell.latitude]);
@@ -140,6 +151,7 @@ export const App: React.FC = () => {
   const [isEmergency, setIsEmergency] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('2d-grid');
   const [panelMode, setPanelMode] = useState<PanelMode>('route');
+  const [demoStep, setDemoStep] = useState(0);
   const [isDropModeActive, setIsDropModeActive] = useState<boolean>(false);
   const [isBookmarksOpen, setIsBookmarksOpen] = useState<boolean>(false);
   const [selectedBookmark, setSelectedBookmark] = useState<MarsBookmark | null>(null);
@@ -180,9 +192,8 @@ export const App: React.FC = () => {
         setNormalRoute(routeResultToRouteData(result, 'normal'));
         setRoutingError(null);
       } catch (error) {
-        setRoutingError(error instanceof Error ? error.message : 'Python routing service is unavailable.');
-        // Auto-retry after 3 seconds if service is still starting up
-        timeoutId = window.setTimeout(requestNormalRoute, 3000);
+        setRoutingError(friendlyRoutingError(error));
+        timeoutId = window.setTimeout(requestNormalRoute, 5000);
       } finally {
         setIsRouting(false);
       }
@@ -195,18 +206,18 @@ export const App: React.FC = () => {
     };
   }, []);
 
-  const handleToggleEmergency = async () => {
+  const handleToggleEmergency = async (): Promise<boolean> => {
     setPanelMode('route');
     if (isEmergency) {
       setIsEmergency(false);
       setTelemetry(NOMINAL_ROVER_TELEMETRY);
       setRoutingError(null);
       setBlockedHazardCells(null);
-      return;
+      return true;
     }
     if (!normalRouteResult) {
       setRoutingError('The outbound route must load before an emergency can be simulated.');
-      return;
+      return false;
     }
 
     setIsRouting(true);
@@ -236,8 +247,10 @@ export const App: React.FC = () => {
       setBlockedHazardCells(blockedCells);
       setIsEmergency(true);
       setTelemetry(EMERGENCY_ROVER_TELEMETRY);
+      return true;
     } catch (error) {
-      setRoutingError(error instanceof Error ? error.message : 'Emergency routing failed.');
+      setRoutingError(friendlyRoutingError(error));
+      return false;
     } finally {
       setIsRouting(false);
     }
@@ -271,6 +284,38 @@ export const App: React.FC = () => {
     ? routeResultToCalculation(activeResult)
     : { ...EMPTY_CALCULATION, warnings: routingError ? [routingError] : EMPTY_CALCULATION.warnings };
 
+  const toggleLayer = (layerKey: keyof LayerVisibility) => setLayers((previous) => ({
+    ...previous,
+    [layerKey]: !previous[layerKey]
+  }));
+
+  const explainDemoRoute = () => {
+    setPanelMode('route');
+    setViewMode('2d-grid');
+    setDemoStep(1);
+  };
+
+  const injectDemoHazard = async () => {
+    const succeeded = await handleToggleEmergency();
+    if (succeeded) setDemoStep(2);
+    return succeeded;
+  };
+
+  const replayDemoRoute = () => {
+    setViewMode('3d-rover');
+    setDemoStep(3);
+  };
+
+  const resetDemo = async () => {
+    const succeeded = isEmergency ? await handleToggleEmergency() : true;
+    if (succeeded) {
+      setViewMode('2d-grid');
+      setPanelMode('route');
+      setDemoStep(0);
+    }
+    return succeeded;
+  };
+
   return (
     <div className="app-shell">
       <Header
@@ -278,17 +323,6 @@ export const App: React.FC = () => {
         isEmergency={isEmergency}
         viewMode={viewMode}
         onChangeViewMode={setViewMode}
-        onToggleBookmarks={() => setIsBookmarksOpen((prev) => !prev)}
-        isBookmarksOpen={isBookmarksOpen}
-        onCenterBase={() => {
-          setFocusedCoordinates(GALE_BASE_COORDINATES);
-        }}
-        onCenterTarget={() => {
-          setFocusedCoordinates(BOXWORK_TARGET_COORDINATES);
-        }}
-        onCenterRover={() => {
-          setFocusedCoordinates(CURRENT_ROVER_COORDINATES);
-        }}
       />
 
       <main className="mission-grid">
@@ -337,6 +371,17 @@ export const App: React.FC = () => {
               />
             )}
 
+            {viewMode !== '3d-rover' && (
+              <MapToolbar
+                showSites={viewMode === '3d-orbital' || viewMode === '3d-surface'}
+                sitesOpen={isBookmarksOpen}
+                onToggleSites={() => setIsBookmarksOpen((previous) => !previous)}
+                onCenterBase={() => setFocusedCoordinates(GALE_BASE_COORDINATES)}
+                onCenterTarget={() => setFocusedCoordinates(BOXWORK_TARGET_COORDINATES)}
+                onCenterRover={() => setFocusedCoordinates(CURRENT_ROVER_COORDINATES)}
+              />
+            )}
+
             {/* Bookmarks Drawer Overlay */}
             {isBookmarksOpen && (viewMode === '3d-orbital' || viewMode === '3d-surface') && (
               <div className="absolute top-3 left-3 z-30 animate-in fade-in slide-in-from-left-4 duration-200">
@@ -361,13 +406,9 @@ export const App: React.FC = () => {
 
           {/* Layer Controls (Available in 2D grid mode) */}
           {viewMode === '2d-grid' && (
-            <LayerControls
-              layers={layers}
-              onToggleLayer={(layerKey) => setLayers((previous) => ({
-                ...previous,
-                [layerKey]: !previous[layerKey]
-              }))}
-            />
+            <div className="desktop-layer-controls">
+              <LayerControls layers={layers} onToggleLayer={toggleLayer} />
+            </div>
           )}
         </section>
 
@@ -382,14 +423,17 @@ export const App: React.FC = () => {
             </span>
           </div>
 
-          <EmergencyControl
-            isEmergency={isEmergency}
-            isRouting={isRouting}
-            error={routingError}
-            onToggleEmergency={handleToggleEmergency}
+          <DemoGuide
+            step={demoStep}
+            routeReady={Boolean(normalRouteResult)}
+            isBusy={isRouting}
+            onExplain={explainDemoRoute}
+            onInjectHazard={injectDemoHazard}
+            onReplay={replayDemoRoute}
+            onReset={resetDemo}
           />
 
-          <div className="mission-panel-tabs" role="tablist" aria-label="Mission information">
+          <div className="mission-panel-tabs desktop-mission-panels" role="tablist" aria-label="Mission information">
             <button
               type="button"
               role="tab"
@@ -410,7 +454,7 @@ export const App: React.FC = () => {
             </button>
           </div>
 
-          <div className="mission-panel-content">
+          <div className="mission-panel-content desktop-mission-panels">
             {panelMode === 'route' ? (
               <RouteExplanation
                 activeRoute={activeRoute}
@@ -421,6 +465,34 @@ export const App: React.FC = () => {
             ) : (
               <TelemetryHUD telemetry={telemetry} isEmergency={isEmergency} />
             )}
+          </div>
+
+          <div className="desktop-mission-panels">
+            <EmergencyControl
+              isEmergency={isEmergency}
+              isRouting={isRouting}
+              error={routingError}
+              onToggleEmergency={handleToggleEmergency}
+            />
+          </div>
+
+          <div className="mobile-mission-panels">
+            <RouteExplanation
+              activeRoute={activeRoute}
+              routeCalculation={routeCalculation}
+              isEmergency={isEmergency}
+              onSelectWaypoint={setFocusedCoordinates}
+            />
+            <EmergencyControl
+              isEmergency={isEmergency}
+              isRouting={isRouting}
+              error={routingError}
+              onToggleEmergency={handleToggleEmergency}
+            />
+            {viewMode === '2d-grid' && (
+              <CollapsibleLayerControls layers={layers} onToggleLayer={toggleLayer} />
+            )}
+            <TelemetryHUD telemetry={telemetry} isEmergency={isEmergency} />
           </div>
         </aside>
       </main>

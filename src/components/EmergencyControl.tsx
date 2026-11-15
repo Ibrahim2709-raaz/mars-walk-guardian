@@ -5,7 +5,7 @@ interface EmergencyControlProps {
   isEmergency: boolean;
   isRouting: boolean;
   error?: string | null;
-  onToggleEmergency: () => void | Promise<void>;
+  onToggleEmergency: () => void | Promise<unknown>;
 }
 
 export const EmergencyControl: React.FC<EmergencyControlProps> = ({

@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   BatteryCharging,
-  Bookmark,
   Bot,
   Compass,
   Footprints,
@@ -18,11 +17,6 @@ interface HeaderProps {
   isEmergency: boolean;
   viewMode: ViewMode;
   onChangeViewMode: (mode: ViewMode) => void;
-  onToggleBookmarks?: () => void;
-  isBookmarksOpen?: boolean;
-  onCenterBase: () => void;
-  onCenterTarget: () => void;
-  onCenterRover?: () => void;
 }
 
 const VIEW_OPTIONS: { mode: ViewMode; label: string; shortLabel: string; icon: React.ElementType }[] = [
@@ -36,12 +30,7 @@ export const Header: React.FC<HeaderProps> = ({
   telemetry,
   isEmergency,
   viewMode,
-  onChangeViewMode,
-  onToggleBookmarks,
-  isBookmarksOpen,
-  onCenterBase,
-  onCenterTarget,
-  onCenterRover
+  onChangeViewMode
 }) => {
   return (
     <header className="mission-header">
@@ -109,26 +98,6 @@ export const Header: React.FC<HeaderProps> = ({
           ))}
         </div>
 
-        <div className="mission-quick-actions">
-          {onToggleBookmarks && viewMode !== '3d-rover' && (
-            <button
-              type="button"
-              onClick={onToggleBookmarks}
-              className={isBookmarksOpen ? 'is-active' : ''}
-              title="Mission bookmarks"
-            >
-              <Bookmark className="h-3.5 w-3.5" />
-              <span>Sites</span>
-            </button>
-          )}
-          {viewMode !== '3d-rover' && (
-            <>
-              <button className="mission-location-action" type="button" onClick={onCenterBase}>Base</button>
-              <button className="mission-location-action" type="button" onClick={onCenterTarget}>Target</button>
-              {onCenterRover && <button className="mission-location-action" type="button" onClick={onCenterRover}>Rover</button>}
-            </>
-          )}
-        </div>
       </div>
     </header>
   );
