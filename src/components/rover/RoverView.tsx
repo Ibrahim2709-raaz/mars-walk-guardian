@@ -114,7 +114,7 @@ function PlaybackView({
     </div>
     <p className="px-3 pb-1 text-xs text-slate-300">Visual time acceleration: {VISUAL_TIME_ACCELERATION}× · Simulated rover speed: {telemetry.speedCmPerSec} cm/s</p>
     <p className="px-3 pb-2 text-[11px] text-slate-400">
-      Measured NASA-derived HiRISE elevation. Illustrative terrain colors. Simulated slip, blockage, and telemetry.
+      NASA HiRISE elevation and surface imagery. Terrain colors are illustrative. Simulated slip, blockage, and telemetry.
       {' '}The science target is a Sol 4621 waypoint-linked candidate with unconfirmed geology.
     </p>
   </section>;
