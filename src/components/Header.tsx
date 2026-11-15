@@ -1,8 +1,8 @@
 ﻿import React from 'react';
-import { Compass, Radio, Globe, Footprints, Map as MapIcon, Bookmark } from 'lucide-react';
+import { Compass, Radio, Globe, Footprints, Map as MapIcon, Bookmark, Bot } from 'lucide-react';
 import { RoverTelemetry } from '../types';
 
-export type ViewMode = '3d-orbital' | '3d-surface' | '2d-grid';
+export type ViewMode = '3d-orbital' | '3d-surface' | '2d-grid' | '3d-rover';
 
 interface HeaderProps {
   telemetry: RoverTelemetry;
@@ -89,11 +89,24 @@ export const Header: React.FC<HeaderProps> = ({
           <MapIcon className="w-3.5 h-3.5" />
           <span className="hidden sm:inline">2D TACTICAL</span>
         </button>
+
+        <button
+          onClick={() => onChangeViewMode('3d-rover')}
+          aria-pressed={viewMode === '3d-rover'}
+          aria-label="3D ROVER"
+          title="3D Rover Traverse"
+          className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+            viewMode === '3d-rover' ? 'bg-slate-800 text-amber-300 border border-amber-500/40 shadow-sm' : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Bot className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">3D ROVER</span>
+        </button>
       </div>
 
       {/* Right: Bookmarks Drawer Toggle & Quick Centers */}
       <div className="flex items-center gap-2">
-        {onToggleBookmarks && (
+        {onToggleBookmarks && viewMode !== '3d-rover' && (
           <button
             onClick={onToggleBookmarks}
             className={`px-2.5 py-1.5 rounded-lg text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer border ${
@@ -117,7 +130,7 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="text-orange-300 font-semibold">SOL {telemetry.missionTime.sol}</span>
         </div>
 
-        <div className="hidden lg:flex items-center gap-1.5">
+        <div className={viewMode === '3d-rover' ? 'hidden' : 'hidden lg:flex items-center gap-1.5'}>
           <button
             onClick={onCenterBase}
             title="Recenter Map on Gale Rover Base — Simulated Operations Point"
