@@ -19,12 +19,16 @@ interface FirstPersonHUDProps {
   telemetry: FirstPersonTelemetry;
   onExit: () => void;
   onVirtualMove?: (direction: 'forward' | 'backward' | 'left' | 'right' | 'stop') => void;
+  isPointerLocked?: boolean;
+  onTogglePointerLock?: () => void;
 }
 
 export const FirstPersonHUD: React.FC<FirstPersonHUDProps> = ({
   telemetry,
   onExit,
-  onVirtualMove
+  onVirtualMove,
+  isPointerLocked = false,
+  onTogglePointerLock
 }) => {
   const formatCoord = (deg: number, posLabel: string, negLabel: string) => {
     const dir = deg >= 0 ? posLabel : negLabel;
@@ -55,6 +59,27 @@ export const FirstPersonHUD: React.FC<FirstPersonHUDProps> = ({
               FIRST-PERSON SURFACE MODE (1.7m AGL)
             </span>
           </div>
+
+          {onTogglePointerLock && (
+            <button
+              onClick={onTogglePointerLock}
+              className={`rounded-lg px-3 py-1.5 text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-lg backdrop-blur border ${
+                isPointerLocked
+                  ? 'bg-cyan-950/90 text-cyan-200 border-cyan-400 shadow-cyan-500/20'
+                  : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 border-slate-700 hover:border-cyan-500/40'
+              }`}
+              title="Lock mouse cursor to look around freely in 360 degrees (Esc to release)"
+            >
+              <Eye className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="hidden sm:inline">
+                {isPointerLocked ? 'MOUSE LOOK: ACTIVE (ESC)' : 'ENGAGE MOUSE LOOK'}
+              </span>
+              <span className="sm:hidden">
+                {isPointerLocked ? 'LOOK: ON' : 'LOOK: OFF'}
+              </span>
+            </button>
+          )}
+
           <button
             onClick={onExit}
             className="bg-slate-900/90 hover:bg-red-950/80 border border-slate-700 hover:border-red-500/60 text-slate-300 hover:text-red-200 rounded-lg px-3 py-1.5 text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-lg backdrop-blur"
@@ -89,14 +114,20 @@ export const FirstPersonHUD: React.FC<FirstPersonHUDProps> = ({
       </div>
 
       {/* Center Screen Tactical Reticle / Horizon Mark */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40">
+      <div className={`absolute inset-0 flex flex-col items-center justify-center pointer-events-none transition-opacity duration-300 ${isPointerLocked ? 'opacity-80' : 'opacity-40'}`}>
         <div className="relative w-12 h-12">
-          <div className="absolute top-1/2 left-0 w-3 h-[1px] bg-cyan-400 -translate-y-1/2" />
-          <div className="absolute top-1/2 right-0 w-3 h-[1px] bg-cyan-400 -translate-y-1/2" />
-          <div className="absolute top-0 left-1/2 h-3 w-[1px] bg-cyan-400 -translate-x-1/2" />
-          <div className="absolute bottom-0 left-1/2 h-3 w-[1px] bg-cyan-400 -translate-x-1/2" />
-          <div className="absolute inset-2 rounded-full border border-cyan-400/50" />
+          <div className="absolute top-1/2 left-0 w-3 h-[1.5px] bg-cyan-400 -translate-y-1/2" />
+          <div className="absolute top-1/2 right-0 w-3 h-[1.5px] bg-cyan-400 -translate-y-1/2" />
+          <div className="absolute top-0 left-1/2 h-3 w-[1.5px] bg-cyan-400 -translate-x-1/2" />
+          <div className="absolute bottom-0 left-1/2 h-3 w-[1.5px] bg-cyan-400 -translate-x-1/2" />
+          <div className="absolute inset-2.5 rounded-full border border-cyan-400/60" />
+          {isPointerLocked && <div className="absolute inset-[21px] rounded-full bg-cyan-300 animate-pulse" />}
         </div>
+        {!isPointerLocked && (
+          <span className="mt-2 text-[10px] font-mono text-cyan-300/80 bg-slate-950/70 px-2 py-0.5 rounded border border-cyan-500/30">
+            Click to engage 360° mouse look (or drag)
+          </span>
+        )}
       </div>
 
       {/* Bottom Bar: Telemetry Readings + Mobile Touch Controls */}

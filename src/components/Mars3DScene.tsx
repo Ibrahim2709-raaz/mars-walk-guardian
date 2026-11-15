@@ -34,6 +34,8 @@ interface Mars3DSceneProps {
   onModeChange?: (mode: 'orbital' | 'surface') => void;
   selectedBookmark?: MarsBookmark | null;
   onClearSelectedBookmark?: () => void;
+  focusedCoordinates?: [number, number] | null;
+  onClearFocusedCoordinates?: () => void;
 }
 
 export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
@@ -46,7 +48,9 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
   onDropModeChange,
   onModeChange,
   selectedBookmark,
-  onClearSelectedBookmark
+  onClearSelectedBookmark,
+  focusedCoordinates,
+  onClearFocusedCoordinates
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<SceneView | null>(null);
@@ -57,6 +61,7 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
   // Application State
   const [mode, setMode] = useState<'orbital' | 'surface'>(propMode);
   const [isTerrainLoading, setIsTerrainLoading] = useState<boolean>(true);
+  const [isPointerLocked, setIsPointerLocked] = useState<boolean>(false);
 
   // First-Person Controller State
   const [eyeHeightM, setEyeHeightM] = useState<number>(1.7);
@@ -235,7 +240,53 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
       addMarkers();
     });
 
+    // Intercept default drag in surface mode so ArcGIS orbit navigation doesn't fight first-person look
+    const dragHandle = view.on('drag', (event) => {
+      if (modeRef.current === 'surface') {
+        event.stopPropagation();
+
+        if (event.action === 'start') {
+          lastMousePosRef.current = { x: event.x, y: event.y };
+          isMouseDownRef.current = true;
+        } else if (event.action === 'update' && isMouseDownRef.current) {
+          const deltaX = event.x - lastMousePosRef.current.x;
+          const deltaY = event.y - lastMousePosRef.current.y;
+          lastMousePosRef.current = { x: event.x, y: event.y };
+
+          const cam = view.camera.clone();
+          cam.heading = (cam.heading + deltaX * 0.22 + 360) % 360;
+          cam.tilt = Math.max(35, Math.min(115, cam.tilt + deltaY * 0.22));
+          view.camera = cam;
+
+          setTelemetry((prev) => ({
+            ...prev,
+            headingDeg: cam.heading
+          }));
+        } else if (event.action === 'end') {
+          isMouseDownRef.current = false;
+        }
+      }
+    });
+
+    const wheelHandle = view.on('mouse-wheel', (event) => {
+      if (modeRef.current === 'surface') {
+        event.stopPropagation();
+        // Mouse wheel adjusts eye height in surface mode
+        const delta = event.deltaY < 0 ? 0.3 : -0.3;
+        setEyeHeightM((prev) => Math.max(0.6, Math.min(25.0, Number((prev + delta).toFixed(1)))));
+      }
+    });
+
+    const dblClickHandle = view.on('double-click', (event) => {
+      if (modeRef.current === 'surface') {
+        event.stopPropagation();
+      }
+    });
+
     return () => {
+      dragHandle.remove();
+      wheelHandle.remove();
+      dblClickHandle.remove();
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
       view.destroy();
       viewRef.current = null;
@@ -427,7 +478,7 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
   const dropToSurfaceAt = useCallback(
     async (point: Point) => {
       const view = viewRef.current;
-      if (!view) return;
+      if (!view || !view.map?.ground) return;
 
       setIsTerrainLoading(true);
 
@@ -455,7 +506,7 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
           tilt: 82 // Looking towards the horizon
         });
 
-        await view.goTo(firstPersonCamera, { duration: 2500, easing: 'in-out-cubic' });
+        await view.goTo(firstPersonCamera, { duration: 2500, easing: 'in-out-cubic' as any });
 
         setMode('surface');
         if (onModeChange) onModeChange('surface');
@@ -497,14 +548,14 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
       position: new Point({
         x: currentPos.x,
         y: currentPos.y - 0.05,
-        z: Math.max(35000, currentPos.z * 10),
+        z: Math.max(35000, (currentPos.z ?? 0) * 10),
         spatialReference: marsSpatialReference
       }),
       heading: view.camera.heading,
       tilt: 45
     });
 
-    await view.goTo(orbitalCamera, { duration: 2000, easing: 'in-out-cubic' });
+    await view.goTo(orbitalCamera, { duration: 2000, easing: 'in-out-cubic' as any });
   }, [onModeChange, onDropModeChange]);
 
   // Focus directly on the 86m Gale Crater Route
@@ -523,7 +574,7 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
       tilt: 58
     });
 
-    await view.goTo(missionCamera, { duration: 2200, easing: 'in-out-cubic' });
+    await view.goTo(missionCamera, { duration: 2200, easing: 'in-out-cubic' as any });
   }, []);
 
   // Respond to prop mode changes (e.g. Header button click)
@@ -578,7 +629,7 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
       tilt: bookmark.camera.tilt
     });
 
-    void view.goTo(cam, { duration: 2400, easing: 'in-out-cubic' });
+    void view.goTo(cam, { duration: 2400, easing: 'in-out-cubic' as any });
   }, []);
 
   // Respond to bookmark selection from parent
@@ -588,6 +639,100 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
       onClearSelectedBookmark?.();
     }
   }, [selectedBookmark, handleFlyToBookmark, onClearSelectedBookmark]);
+
+  // Handle focusing landmark or coordinate (e.g. [Base], [Target], [Rover], or Waypoint)
+  useEffect(() => {
+    if (!focusedCoordinates) return;
+    const view = viewRef.current;
+    if (!view) return;
+
+    const [targetLng, targetLat] = focusedCoordinates;
+    const targetPoint = new Point({
+      x: targetLng,
+      y: targetLat,
+      spatialReference: marsSpatialReference
+    });
+
+    if (mode === 'surface') {
+      // In first-person mode: teleport observer directly to this landmark at 1.7m eye-level!
+      void dropToSurfaceAt(targetPoint);
+    } else {
+      // In 3D orbital globe mode: fly smoothly to focus this target!
+      const isGale = Math.abs(targetLng - 137.38) < 0.5 && Math.abs(targetLat - -4.805) < 0.5;
+      const targetZ = isGale ? -3440 : 25000;
+      const targetTilt = isGale ? 60 : 45;
+
+      const targetCamera = new Camera({
+        position: new Point({
+          x: targetLng,
+          y: targetLat - (isGale ? 0.002 : 0.05),
+          z: targetZ,
+          spatialReference: marsSpatialReference
+        }),
+        heading: 350,
+        tilt: targetTilt
+      });
+
+      void view.goTo(targetCamera, { duration: 2000, easing: 'in-out-cubic' as any });
+    }
+
+    // Temporary highlight marker
+    const focusGraphic = new Graphic({
+      geometry: targetPoint,
+      symbol: {
+        type: 'point-3d',
+        symbolLayers: [
+          {
+            type: 'icon',
+            size: 24,
+            material: { color: [249, 115, 22] },
+            outline: { color: [255, 255, 255, 0.95], size: 2.5 },
+            resource: { primitive: 'circle' }
+          }
+        ],
+        verticalOffset: {
+          screenLength: 32,
+          maxWorldLength: 100000,
+          minWorldLength: 20
+        },
+        callout: {
+          type: 'line',
+          size: 2,
+          color: [249, 115, 22, 0.9]
+        }
+      } as any
+    });
+
+    markersGraphicsLayerRef.current?.add(focusGraphic);
+    const timer = setTimeout(() => {
+      markersGraphicsLayerRef.current?.remove(focusGraphic);
+      onClearFocusedCoordinates?.();
+    }, 4500);
+
+    return () => clearTimeout(timer);
+  }, [focusedCoordinates, mode, dropToSurfaceAt, onClearFocusedCoordinates]);
+
+  // Pointer Lock Toggle & Event Handling
+  const togglePointerLock = useCallback(() => {
+    if (document.pointerLockElement) {
+      document.exitPointerLock?.();
+    } else if (containerRef.current) {
+      containerRef.current.requestPointerLock?.();
+    }
+  }, []);
+
+  useEffect(() => {
+    const handlePointerLockChange = () => {
+      const locked = document.pointerLockElement === containerRef.current;
+      isPointerLockedRef.current = locked;
+      setIsPointerLocked(locked);
+    };
+
+    document.addEventListener('pointerlockchange', handlePointerLockChange);
+    return () => {
+      document.removeEventListener('pointerlockchange', handlePointerLockChange);
+    };
+  }, []);
 
   // First-Person Frame Loop (WASD Movement & Eye-Level Tracking)
   useEffect(() => {
@@ -648,14 +793,14 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
         });
 
         // Fast terrain query to keep camera strictly at eye-height above Martian surface
-        if (!queryPending) {
+        if (!queryPending && view.map?.ground) {
           queryPending = true;
           view.map.ground
             .queryElevation(nextPoint)
             .then((res) => {
               queryPending = false;
               if (!isRunning || modeRef.current !== 'surface') return;
-              const groundZ = (res?.geometry as Point)?.z ?? nextPoint.z - eyeHeightRef.current;
+              const groundZ = (res?.geometry as Point)?.z ?? (nextPoint.z ?? 0) - eyeHeightRef.current;
               camera.position = new Point({
                 x: nextPoint.x,
                 y: nextPoint.y,
@@ -718,22 +863,22 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
 
     const handleMouseMove = (e: MouseEvent) => {
       if (modeRef.current !== 'surface' || !viewRef.current) return;
+      if (!isPointerLockedRef.current) return; // Free dragging without pointer lock is handled by view.on('drag')
 
       const view = viewRef.current;
+      const deltaX = e.movementX;
+      const deltaY = e.movementY;
 
-      // Rotate camera via Pointer Lock or Click-Drag
-      if (isPointerLockedRef.current || isMouseDownRef.current) {
-        const deltaX = isPointerLockedRef.current ? e.movementX : e.clientX - lastMousePosRef.current.x;
-        const deltaY = isPointerLockedRef.current ? e.movementY : e.clientY - lastMousePosRef.current.y;
+      const camera = view.camera.clone();
+      camera.heading = (camera.heading + deltaX * 0.16 + 360) % 360;
+      // Clamp tilt between 35° (looking up) and 115° (looking down)
+      camera.tilt = Math.max(35, Math.min(115, camera.tilt + deltaY * 0.16));
+      view.camera = camera;
 
-        lastMousePosRef.current = { x: e.clientX, y: e.clientY };
-
-        const camera = view.camera.clone();
-        camera.heading = (camera.heading + deltaX * 0.18 + 360) % 360;
-        // Clamp tilt so user cannot flip upside down
-        camera.tilt = Math.max(35, Math.min(115, camera.tilt + deltaY * 0.18));
-        view.camera = camera;
-      }
+      setTelemetry((prev) => ({
+        ...prev,
+        headingDeg: camera.heading
+      }));
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -756,8 +901,19 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
       {/* ArcGIS 3D Canvas Container */}
       <div
         ref={containerRef}
+        onClick={() => {
+          if (mode === 'surface' && !isPointerLocked) {
+            togglePointerLock();
+          }
+        }}
         className={`absolute inset-0 w-full h-full ${
-          isDropModeActive ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'
+          isDropModeActive
+            ? 'cursor-crosshair'
+            : mode === 'surface'
+            ? isPointerLocked
+              ? 'cursor-none'
+              : 'cursor-grab active:cursor-grabbing'
+            : 'cursor-grab active:cursor-grabbing'
         }`}
       />
 
@@ -780,6 +936,8 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
         <FirstPersonHUD
           telemetry={telemetry}
           onExit={() => void exitToOrbit()}
+          isPointerLocked={isPointerLocked}
+          onTogglePointerLock={togglePointerLock}
           onVirtualMove={(dir) => {
             if (dir === 'forward') keysDownRef.current['KeyW'] = true;
             if (dir === 'backward') keysDownRef.current['KeyS'] = true;

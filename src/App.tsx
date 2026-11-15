@@ -305,6 +305,8 @@ export const App: React.FC = () => {
                 }}
                 selectedBookmark={selectedBookmark}
                 onClearSelectedBookmark={() => setSelectedBookmark(null)}
+                focusedCoordinates={focusedCoordinates}
+                onClearFocusedCoordinates={() => setFocusedCoordinates(null)}
               />
             )}
 
@@ -321,7 +323,7 @@ export const App: React.FC = () => {
                   onDropHereMode={() => {
                     setIsDropModeActive(true);
                     setIsBookmarksOpen(false);
-                    if (viewMode === '2d-grid') setViewMode('3d-orbital');
+                    setViewMode('3d-orbital');
                   }}
                   isDropModeActive={isDropModeActive}
                   onClose={() => setIsBookmarksOpen(false)}

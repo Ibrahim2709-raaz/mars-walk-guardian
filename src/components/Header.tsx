@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import { Compass, Radio, ShieldAlert, Cpu, Globe, Footprints, Map as MapIcon, Bookmark } from 'lucide-react';
+import { Compass, Radio, Globe, Footprints, Map as MapIcon, Bookmark } from 'lucide-react';
 import { RoverTelemetry } from '../types';
 
 export type ViewMode = '3d-orbital' | '3d-surface' | '2d-grid';
@@ -18,7 +18,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   telemetry,
-  isEmergency,
+  isEmergency: _isEmergency,
   viewMode,
   onChangeViewMode,
   onToggleBookmarks,
