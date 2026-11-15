@@ -10,15 +10,21 @@
   },
   "dependencies": {
     "@arcgis/core": "^5.2.4",
+    "@react-three/drei": "10.7.9",
+    "@react-three/fiber": "9.8.2",
     "lucide-react": "^1.16.0",
     "maplibre-gl": "^6.18.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "three": "0.179.1",
+    "three-mesh-bvh": "0.8.3",
+    "three-stdlib": "2.36.1"
   },
   "devDependencies": {
     "@types/node": "^22.13.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@types/three": "0.179.0",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.5.33",
