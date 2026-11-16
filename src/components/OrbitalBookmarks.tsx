@@ -1,16 +1,22 @@
 import React, { useState } from 'react';
-import { Bookmark, Compass, Footprints, Mountain, Rocket, Search, ChevronRight, X } from 'lucide-react';
+import { Bookmark, Compass, Crosshair, Eye, Footprints, Mountain, Rocket, Search, X } from 'lucide-react';
 import { MARS_BOOKMARKS, MarsBookmark } from '../data/mars3DData';
 
 interface OrbitalBookmarksProps {
-  onFlyTo: (bookmark: MarsBookmark) => void;
+  onView: (bookmark: MarsBookmark) => void;
+  onSelectTarget: (bookmark: MarsBookmark) => void;
+  getBookmarkScope: (bookmark: MarsBookmark) => 'terrain' | 'base' | 'regional';
+  activeTargetId?: string;
   onDropHereMode: () => void;
   isDropModeActive: boolean;
   onClose?: () => void;
 }
 
 export const OrbitalBookmarks: React.FC<OrbitalBookmarksProps> = ({
-  onFlyTo,
+  onView,
+  onSelectTarget,
+  getBookmarkScope,
+  activeTargetId,
   onDropHereMode,
   isDropModeActive,
   onClose
@@ -133,11 +139,15 @@ export const OrbitalBookmarks: React.FC<OrbitalBookmarksProps> = ({
       {/* Bookmarks List */}
       <div className="overflow-y-auto flex-1 p-2 space-y-1.5">
         {filteredBookmarks.map((bookmark) => {
+          const scope = getBookmarkScope(bookmark);
+          const canTerrainRoute = scope === 'terrain';
+          const isActiveTarget = activeTargetId === bookmark.id;
           return (
             <div
               key={bookmark.id}
-              onClick={() => onFlyTo(bookmark)}
-              className="p-2.5 rounded-lg border border-slate-800/80 bg-slate-900/50 hover:bg-slate-800/80 hover:border-orange-500/40 cursor-pointer transition-all flex items-start justify-between gap-2 group"
+              className={`p-2.5 rounded-lg border bg-slate-900/50 transition-all group ${
+                isActiveTarget ? 'border-orange-500/60' : 'border-slate-800/80 hover:border-orange-500/40'
+              }`}
             >
               <div className="flex items-start gap-2 min-w-0">
                 <span
@@ -173,9 +183,41 @@ export const OrbitalBookmarks: React.FC<OrbitalBookmarksProps> = ({
                       </span>
                     )}
                   </div>
+                  <div className={`mt-1.5 text-[9px] font-bold tracking-wide ${
+                    canTerrainRoute ? 'text-emerald-400' : 'text-cyan-400'
+                  }`}>
+                    {scope === 'terrain'
+                      ? 'TERRAIN ROUTING AVAILABLE'
+                      : scope === 'base'
+                      ? 'GALE ROUTING ORIGIN'
+                      : 'REGIONAL VIEW ONLY'}
+                  </div>
                 </div>
               </div>
-              <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-orange-400 shrink-0 mt-1 transition-colors" />
+              <div className="grid grid-cols-2 gap-1.5 mt-2 pl-8">
+                <button
+                  type="button"
+                  onClick={() => onView(bookmark)}
+                  className="flex items-center justify-center gap-1 rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-[9px] font-bold text-slate-300 hover:border-cyan-500/50 hover:text-cyan-300"
+                >
+                  <Eye className="h-3 w-3" />
+                  VIEW
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSelectTarget(bookmark)}
+                  className={`flex items-center justify-center gap-1 rounded border px-2 py-1.5 text-[9px] font-bold ${
+                    isActiveTarget
+                      ? 'border-orange-400/60 bg-orange-500/20 text-orange-200'
+                      : canTerrainRoute
+                      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'
+                      : 'border-cyan-500/40 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20'
+                  }`}
+                >
+                  <Crosshair className="h-3 w-3" />
+                  {scope === 'terrain' ? 'SET TARGET' : scope === 'base' ? 'RESET GALE' : 'OPEN REGION'}
+                </button>
+              </div>
             </div>
           );
         })}

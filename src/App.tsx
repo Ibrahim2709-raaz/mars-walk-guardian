@@ -5,6 +5,7 @@ import { LayerControls } from './components/LayerControls';
 import { MarsMap } from './components/MarsMap';
 import { Mars3DScene } from './components/Mars3DScene';
 import { OrbitalBookmarks } from './components/OrbitalBookmarks';
+import { RegionalTargetNotice } from './components/RegionalTargetNotice';
 import { RouteExplanation } from './components/RouteExplanation';
 import { TelemetryHUD } from './components/TelemetryHUD';
 import {
@@ -12,9 +13,15 @@ import {
   CURRENT_ROVER_COORDINATES,
   GALE_BASE_COORDINATES
 } from './data/marsGeoData';
-import { MarsBookmark } from './data/mars3DData';
+import { MARS_BOOKMARKS, MarsBookmark } from './data/mars3DData';
 import { EMERGENCY_ROVER_TELEMETRY, NOMINAL_ROVER_TELEMETRY } from './data/mockTelemetry';
-import { BASE_POSITION, SCIENCE_TARGET_POSITION, TERRAIN_CELL_SIZE_M } from './data/terrainSites';
+import {
+  BASE_POSITION,
+  isInsideTerrainCrop,
+  lngLatToCell,
+  SCIENCE_TARGET_POSITION,
+  TERRAIN_CELL_SIZE_M
+} from './data/terrainSites';
 import { calculateTerrainRoute, RouteResult } from './services/routingApi';
 import {
   LatLng,
@@ -67,7 +74,13 @@ const EMPTY_CALCULATION: RouteCalculationResult = {
 
 type PanelMode = 'route' | 'telemetry';
 
-function routeResultToRouteData(result: RouteResult, type: 'normal' | 'emergency'): RouteData {
+const DEFAULT_TARGET_BOOKMARK = MARS_BOOKMARKS.find((bookmark) => bookmark.id === 'science-candidate')!;
+
+function routeResultToRouteData(
+  result: RouteResult,
+  type: 'normal' | 'emergency',
+  targetName = 'Sol 4621 science-target candidate'
+): RouteData {
   const coordinates = result.path.map((cell): LatLng => [cell.longitude, cell.latitude]);
   let elevationGainMeters = 0;
   let maxSlopeDeg = 0;
@@ -94,7 +107,7 @@ function routeResultToRouteData(result: RouteResult, type: 'normal' | 'emergency
     name: index === 0
       ? type === 'emergency' ? 'Rover fault position' : 'Gale Rover Base — Simulated Operations Point'
       : index === selectedCells.length - 1
-      ? type === 'emergency' ? 'Gale Rover Base — Simulated Operations Point' : 'Sol 4621 science-target candidate'
+      ? type === 'emergency' ? 'Gale Rover Base — Simulated Operations Point' : targetName
       : `Terrain-grid checkpoint ${cell.row},${cell.column}`,
     coordinates: [cell.longitude, cell.latitude],
     elevationMeters: Number(cell.elevation_m.toFixed(2)),
@@ -143,6 +156,9 @@ export const App: React.FC = () => {
   const [isDropModeActive, setIsDropModeActive] = useState<boolean>(false);
   const [isBookmarksOpen, setIsBookmarksOpen] = useState<boolean>(false);
   const [selectedBookmark, setSelectedBookmark] = useState<MarsBookmark | null>(null);
+  const [activeTarget, setActiveTarget] = useState<MarsBookmark>(DEFAULT_TARGET_BOOKMARK);
+  const [regionalTarget, setRegionalTarget] = useState<MarsBookmark | null>(null);
+  const [activeTargetCell, setActiveTargetCell] = useState(SCIENCE_TARGET_POSITION);
   const [layers, setLayers] = useState<LayerVisibility>({
     optical: true,
     slope: true,
@@ -195,6 +211,73 @@ export const App: React.FC = () => {
     };
   }, []);
 
+  const viewBookmark = (bookmark: MarsBookmark) => {
+    setSelectedBookmark(bookmark);
+    setFocusedCoordinates(bookmark.coordinates);
+    setViewMode('3d-orbital');
+    setIsBookmarksOpen(false);
+  };
+
+  const returnToGaleRouting = () => {
+    setActiveTarget(DEFAULT_TARGET_BOOKMARK);
+    setActiveTargetCell(SCIENCE_TARGET_POSITION);
+    setRegionalTarget(null);
+    setSelectedBookmark(DEFAULT_TARGET_BOOKMARK);
+    setFocusedCoordinates(DEFAULT_TARGET_BOOKMARK.coordinates);
+    setIsEmergency(false);
+    setTelemetry(NOMINAL_ROVER_TELEMETRY);
+    setBlockedHazardCells(null);
+    setRoutingError(null);
+  };
+
+  const selectBookmarkTarget = async (bookmark: MarsBookmark) => {
+    if (bookmark.id === 'gale-base') {
+      returnToGaleRouting();
+      setViewMode('3d-orbital');
+      setIsBookmarksOpen(false);
+      return;
+    }
+
+    setActiveTarget(bookmark);
+    viewBookmark(bookmark);
+
+    if (!isInsideTerrainCrop(bookmark.coordinates)) {
+      setRegionalTarget(bookmark);
+      setIsEmergency(false);
+      setTelemetry(NOMINAL_ROVER_TELEMETRY);
+      setBlockedHazardCells(null);
+      setRoutingError(null);
+      return;
+    }
+
+    const targetCell = lngLatToCell(bookmark.coordinates[0], bookmark.coordinates[1]);
+    setRegionalTarget(null);
+    setActiveTargetCell(targetCell);
+    setIsEmergency(false);
+    setTelemetry(NOMINAL_ROVER_TELEMETRY);
+    setBlockedHazardCells(null);
+    setIsRouting(true);
+    setRoutingError(null);
+    try {
+      const result = await calculateTerrainRoute({
+        start: BASE_POSITION,
+        target: targetCell,
+        rover_state: {
+          battery_wh: 100,
+          battery_reserve_wh: 10,
+          energy_per_meter_wh: 0.25
+        }
+      });
+      if (!result.feasible) throw new Error(result.reason ?? 'No feasible route to the selected target.');
+      setNormalRouteResult(result);
+      setNormalRoute(routeResultToRouteData(result, 'normal', bookmark.name));
+    } catch (error) {
+      setRoutingError(error instanceof Error ? error.message : 'Terrain routing failed.');
+    } finally {
+      setIsRouting(false);
+    }
+  };
+
   const handleToggleEmergency = async () => {
     setPanelMode('route');
     if (isEmergency) {
@@ -221,7 +304,7 @@ export const App: React.FC = () => {
       }
 
       const result = await calculateTerrainRoute({
-        start: SCIENCE_TARGET_POSITION,
+        start: activeTargetCell,
         target: BASE_POSITION,
         rover_state: {
           battery_wh: 65,
@@ -284,7 +367,7 @@ export const App: React.FC = () => {
           setFocusedCoordinates(GALE_BASE_COORDINATES);
         }}
         onCenterTarget={() => {
-          setFocusedCoordinates(BOXWORK_TARGET_COORDINATES);
+          setFocusedCoordinates(activeTarget?.coordinates ?? BOXWORK_TARGET_COORDINATES);
         }}
         onCenterRover={() => {
           setFocusedCoordinates(CURRENT_ROVER_COORDINATES);
@@ -341,12 +424,12 @@ export const App: React.FC = () => {
             {isBookmarksOpen && (viewMode === '3d-orbital' || viewMode === '3d-surface') && (
               <div className="absolute top-3 left-3 z-30 animate-in fade-in slide-in-from-left-4 duration-200">
                 <OrbitalBookmarks
-                  onFlyTo={(bm) => {
-                    setSelectedBookmark(bm);
-                    setIsBookmarksOpen(false);
-                    // If bookmark is clicked, update view coordinates
-                    setFocusedCoordinates(bm.coordinates);
-                  }}
+                  onView={viewBookmark}
+                  onSelectTarget={(bookmark) => { void selectBookmarkTarget(bookmark); }}
+                  getBookmarkScope={(bookmark) => bookmark.id === 'gale-base'
+                    ? 'base'
+                    : isInsideTerrainCrop(bookmark.coordinates) ? 'terrain' : 'regional'}
+                  activeTargetId={activeTarget.id}
                   onDropHereMode={() => {
                     setIsDropModeActive(true);
                     setIsBookmarksOpen(false);
@@ -375,21 +458,29 @@ export const App: React.FC = () => {
           <div className="mission-sidebar__summary">
             <div>
               <span className="mission-eyebrow">Mission decision</span>
-              <h2>{isEmergency ? 'Contingency return' : 'Science traverse'}</h2>
+              <h2>{regionalTarget ? regionalTarget.name : isEmergency ? 'Contingency return' : 'Science traverse'}</h2>
             </div>
             <span className={`mission-feasibility ${routeCalculation.feasible ? 'is-feasible' : ''}`}>
-              {isRouting ? 'Routing…' : routeCalculation.feasible ? 'Feasible' : 'Standby'}
+              {regionalTarget ? 'View only' : isRouting ? 'Routing…' : routeCalculation.feasible ? 'Feasible' : 'Standby'}
             </span>
           </div>
 
-          <EmergencyControl
-            isEmergency={isEmergency}
-            isRouting={isRouting}
-            error={routingError}
-            onToggleEmergency={handleToggleEmergency}
-          />
+          {regionalTarget ? (
+            <RegionalTargetNotice
+              bookmark={regionalTarget}
+              onViewTarget={() => viewBookmark(regionalTarget)}
+              onReturnToGale={returnToGaleRouting}
+            />
+          ) : (
+            <>
+              <EmergencyControl
+                isEmergency={isEmergency}
+                isRouting={isRouting}
+                error={routingError}
+                onToggleEmergency={handleToggleEmergency}
+              />
 
-          <div className="mission-panel-tabs" role="tablist" aria-label="Mission information">
+              <div className="mission-panel-tabs" role="tablist" aria-label="Mission information">
             <button
               type="button"
               role="tab"
@@ -408,20 +499,22 @@ export const App: React.FC = () => {
             >
               Rover telemetry
             </button>
-          </div>
+              </div>
 
-          <div className="mission-panel-content">
-            {panelMode === 'route' ? (
-              <RouteExplanation
-                activeRoute={activeRoute}
-                routeCalculation={routeCalculation}
-                isEmergency={isEmergency}
-                onSelectWaypoint={setFocusedCoordinates}
-              />
-            ) : (
-              <TelemetryHUD telemetry={telemetry} isEmergency={isEmergency} />
-            )}
-          </div>
+              <div className="mission-panel-content">
+                {panelMode === 'route' ? (
+                  <RouteExplanation
+                    activeRoute={activeRoute}
+                    routeCalculation={routeCalculation}
+                    isEmergency={isEmergency}
+                    onSelectWaypoint={setFocusedCoordinates}
+                  />
+                ) : (
+                  <TelemetryHUD telemetry={telemetry} isEmergency={isEmergency} />
+                )}
+              </div>
+            </>
+          )}
         </aside>
       </main>
     </div>
