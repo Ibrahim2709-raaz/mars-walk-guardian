@@ -137,3 +137,15 @@ def terrain_route(request: TerrainRouteRequest) -> dict:
         ),
     )
     return asdict(result)
+
+
+class DebugLogModel(BaseModel):
+    tag: str
+    data: str
+
+
+@app.post("/debug/log")
+def log_debug(entry: DebugLogModel) -> dict:
+    print(f"[BROWSER_DEBUG] {entry.tag}: {entry.data}", flush=True)
+    return {"status": "ok"}
+

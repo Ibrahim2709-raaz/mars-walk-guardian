@@ -10,6 +10,7 @@ import GraphicsLayer from '@arcgis/core/layers/GraphicsLayer';
 import ElevationLayer from '@arcgis/core/layers/ElevationLayer';
 import TileLayer from '@arcgis/core/layers/TileLayer';
 import Basemap from '@arcgis/core/Basemap';
+import Ground from '@arcgis/core/Ground';
 import * as reactiveUtils from '@arcgis/core/core/reactiveUtils';
 import '@arcgis/core/assets/esri/themes/dark/main.css';
 
@@ -31,6 +32,16 @@ import {
 import { cellToLngLat } from '../data/terrainSites';
 import { LayerVisibility, RouteData } from '../types';
 import { FirstPersonHUD, FirstPersonTelemetry } from './FirstPersonHUD';
+
+function sendDebugLog(tag: string, data: any) {
+  try {
+    fetch('http://localhost:8000/debug/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tag, data: typeof data === 'object' ? JSON.stringify(data) : String(data) })
+    }).catch(() => {});
+  } catch {}
+}
 
 interface Mars3DSceneProps {
   layers?: LayerVisibility;
@@ -141,14 +152,14 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
     // 2. Configure Mars 2000 Basemap Imagery
     const marsImagery = new TileLayer({
       id: 'marsImagery',
-      portalItem: { id: '1efb16809db84f0c892b9b0662dab0c8' },
+      url: 'https://astro.arcgis.com/arcgis/rest/services/OnMars/MDIM/MapServer',
       title: 'Mars Global Color Imagery',
       copyright: 'USGS Astrogeology Science Center, NASA, JPL, Esri'
     });
 
     const marsHiRise = new TileLayer({
       id: 'marsHiRise',
-      portalItem: { id: 'c1c4c750a2154842ae523c984cc14fa5' },
+      url: 'https://astro.arcgis.com/arcgis/rest/services/OnMars/HiRISE/MapServer',
       title: 'Mars HiRISE High-Resolution Surface Imagery',
       visible: true
     });
@@ -173,10 +184,13 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
     // 4. Construct Mars Map
     const map = new Map({
       basemap: marsBasemap,
-      ground: {
-        surfaceColor: [188, 107, 75], // Mars regolith terracotta
-        layers: [marsElevation]
-      },
+      ground: new Ground({
+        surfaceColor: [188, 107, 75] as any, // Mars regolith terracotta
+        layers: [marsElevation],
+        navigationConstraint: {
+          type: 'none'  // Allow camera below 0-datum (Gale Crater is at -3631m)
+        }
+      }),
       layers: [hazardLayer, routeLayer, markersLayer, focusLayer]
     });
 
@@ -214,27 +228,28 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
 
     // Once globe and elevation layers finish loading, smoothly transition into the Gale Crater mission frame
     view.when(() => {
-      const midLng = (GALE_BASE_COORDINATES[0] + BOXWORK_TARGET_COORDINATES[0]) / 2;
-      const midLat = (GALE_BASE_COORDINATES[1] + BOXWORK_TARGET_COORDINATES[1]) / 2;
-      const cameraPosition = new Point({
-        x: midLng,
-        y: midLat - 0.0028,
-        z: -3460,
-        spatialReference: marsSpatialReference
-      });
+      sendDebugLog('view.when', 'SceneView ready in global viewingMode');
+      marsImagery.load().then(() => sendDebugLog('marsImagery', 'loaded: ' + marsImagery.loaded));
+      marsHiRise.load().then(() => sendDebugLog('marsHiRise', 'loaded: ' + marsHiRise.loaded));
+      marsElevation.load().then(() => sendDebugLog('marsElevation', 'loaded: ' + marsElevation.loaded));
+
       setTimeout(() => {
         if (!initialFocusDoneRef.current && viewRef.current) {
           initialFocusDoneRef.current = true;
-          void viewRef.current.goTo(
-            new Camera({
-              position: cameraPosition,
-              heading: 0,
-              tilt: 46
+          void viewRef.current.goTo({
+            target: new Point({
+              x: 137.37984,
+              y: -4.80483,
+              spatialReference: marsSpatialReference
             }),
-            { duration: 2000, easing: 'in-out-cubic' as any }
-          );
+            heading: 355,
+            tilt: 55,
+            scale: 3000
+          }, { duration: 2000, easing: 'in-out-cubic' as any });
         }
-      }, 1000);
+      }, 1200);
+    }).catch((err) => {
+      sendDebugLog('view.error', String(err));
     });
 
     // Monitor terrain tile loading state
@@ -762,14 +777,24 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
       setIsTerrainLoading(true);
 
       try {
-        // Query exact ground DEM elevation at this Martian coordinate
-        const elevationResult = await view.map.ground.queryElevation(point);
-        let surfaceElevation = (elevationResult?.geometry as Point)?.z;
-
-        // If in Gale Crater area and query is undefined, default to Gale floor elevation (~ -3631m)
-        if (surfaceElevation === undefined || isNaN(surfaceElevation)) {
-          surfaceElevation = Math.abs(point.x - 137.38) < 0.3 && Math.abs(point.y - -4.805) < 0.3 ? -3631 : 0;
+        let surfaceElevation: number | undefined;
+        try {
+          const elevationResult = await view.map.ground.queryElevation(point);
+          const z = (elevationResult?.geometry as Point)?.z;
+          if (z !== undefined && !isNaN(z) && z !== 0) {
+            surfaceElevation = z;
+          }
+        } catch (e) {
+          console.warn('queryElevation error:', e);
         }
+
+        // If queryElevation was not available or gave 0 on Mars, use known surface baseline
+        if (surfaceElevation === undefined) {
+          const isGale = Math.abs(point.x - 137.38) < 0.5 && Math.abs(point.y - -4.805) < 0.5;
+          surfaceElevation = isGale ? -3631.27 : 0;
+        }
+
+        sendDebugLog('dropToSurfaceAt', `point: ${point.x},${point.y} elev: ${surfaceElevation}`);
 
         const currentHeading = view.camera?.heading ?? 0;
 
@@ -782,7 +807,7 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
             spatialReference: marsSpatialReference
           }),
           heading: currentHeading,
-          tilt: 82 // Looking towards the horizon
+          tilt: 80 // Looking towards the horizon
         });
 
         await view.goTo(firstPersonCamera, { duration: 2500, easing: 'in-out-cubic' as any });
@@ -826,19 +851,17 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
     if (onModeChange) onModeChange('orbital');
     if (onDropModeChange) onDropModeChange(false);
 
-    const currentPos = view.camera.position;
-    const orbitalCamera = new Camera({
-      position: new Point({
-        x: currentPos.x,
-        y: currentPos.y - 0.05,
-        z: Math.max(35000, (currentPos.z ?? 0) * 10),
+    // Return smoothly to the 3D Gale Mission corridor
+    await view.goTo({
+      target: new Point({
+        x: 137.37984,
+        y: -4.80483,
         spatialReference: marsSpatialReference
       }),
-      heading: view.camera.heading,
-      tilt: 45
-    });
-
-    await view.goTo(orbitalCamera, { duration: 2000, easing: 'in-out-cubic' as any });
+      heading: 355,
+      tilt: 55,
+      scale: 3000
+    }, { duration: 1800, easing: 'in-out-cubic' as any });
   }, [onModeChange, onDropModeChange]);
 
   // Focus directly on the 86m Gale Crater Route
@@ -846,23 +869,16 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
     const view = viewRef.current;
     if (!view) return;
 
-    const midLng = (GALE_BASE_COORDINATES[0] + BOXWORK_TARGET_COORDINATES[0]) / 2;
-    const midLat = (GALE_BASE_COORDINATES[1] + BOXWORK_TARGET_COORDINATES[1]) / 2;
-    const cameraPosition = new Point({
-      x: midLng,
-      y: midLat - 0.0028,
-      z: -3460,
-      spatialReference: marsSpatialReference
-    });
-
-    await view.goTo(
-      new Camera({
-        position: cameraPosition,
-        heading: 0,
-        tilt: 46
+    await view.goTo({
+      target: new Point({
+        x: 137.37984,
+        y: -4.80483,
+        spatialReference: marsSpatialReference
       }),
-      { duration: 1600, easing: 'in-out-cubic' as any }
-    );
+      heading: 355,
+      tilt: 55,
+      scale: 3000
+    }, { duration: 1800, easing: 'in-out-cubic' as any });
   }, []);
 
   // Respond to prop mode changes (e.g. Header button click)
@@ -872,12 +888,13 @@ export const Mars3DScene: React.FC<Mars3DSceneProps> = ({
       if (propMode === 'surface') {
         const view = viewRef.current;
         if (view) {
-          const currentCenter = view.camera?.position;
-          const targetPt =
-            currentCenter && Math.abs(currentCenter.x) <= 180 && Math.abs(currentCenter.y) <= 90
-              ? new Point({ x: currentCenter.x, y: currentCenter.y, spatialReference: marsSpatialReference })
-              : new Point({ x: 137.38017231, y: -4.80425574, spatialReference: marsSpatialReference });
-          void dropToSurfaceAt(targetPt);
+          // Drop at the active rover base or mission location
+          const dropPt = new Point({
+            x: GALE_BASE_COORDINATES[0],
+            y: GALE_BASE_COORDINATES[1],
+            spatialReference: marsSpatialReference
+          });
+          void dropToSurfaceAt(dropPt);
         }
       }
     }
