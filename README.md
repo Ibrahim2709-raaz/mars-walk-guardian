@@ -1,8 +1,38 @@
-# Mars Rover Guardian & 3D Interactive Mars Explorer
+# Mars Rover Guardian
 
-Mars Rover Guardian is an interactive dual-mode space mission and planetary exploration web application. It combines:
+Mars Rover Guardian is a four-view Mars exploration and rover-mission planning application built for the NASA Space Apps Challenge. It combines:
 1. **Interactive 3D Mars Globe & Surface Explorer** built with the ArcGIS Maps SDK for JavaScript (`SceneView` in global mode, Mars 2000 spatial reference), referencing the architecture of [Esri Explore Mars](https://github.com/Esri/explore-mars).
 2. **Tactical Rover Traverse & Emergency Rerouting System** in Gale Crater, driven by a Python FastAPI weighted A* routing backend with real HiRISE DTM elevation.
+3. **3D Rover Replay** that animates a fictional rover over the measured local terrain and calculated route.
+
+**Live application:** [ibrahim2709-raaz.github.io/mars-walk-guardian](https://ibrahim2709-raaz.github.io/mars-walk-guardian/)
+
+**Routing API:** [mars-walk-guardian-api.onrender.com/health](https://mars-walk-guardian-api.onrender.com/health)
+
+> This is an educational planning demonstration, not flight software or a certified rover-safety system.
+
+---
+
+## Mission Scope and Data Boundary
+
+The operational routing demonstration is intentionally limited to a verified **201 × 201-cell HiRISE terrain crop in Gale Crater**. Each cell represents approximately 1.012 m. The simulated base is at grid cell `(32, 139)`, and the Sol 4621 waypoint-linked science-target candidate is at `(100, 100)`.
+
+- Bookmarks inside the verified crop may use the Python weighted A* terrain router.
+- **Gale Rover Base — Simulated Operations Point** is the fictional routing origin, not a real NASA facility.
+- Bookmarks elsewhere on Mars provide camera and regional context only. The application does **not** invent terrain safety, energy, risk, or route feasibility outside the verified crop.
+- The science target is a waypoint-linked candidate. Exact boxwork geology at that coordinate is not confirmed.
+
+| Input | Classification | Use in the project |
+| --- | --- | --- |
+| HiRISE DTM elevation | Measured NASA/USGS-derived product | Local elevation and terrain routing |
+| HiRISE red-band orthophoto | Measured NASA/JPL-Caltech/UArizona product | 3D local terrain texture |
+| Roughness | Derived from a 5 × 5 elevation window | Weighted routing penalty |
+| Global Mars imagery and elevation | NASA/USGS-derived services | Planet-scale visual context |
+| CRISM/mineral layer | Illustrative mock layer; local overlap unverified | Science-story context only |
+| Slip risk and blocked cells | Simulated | Emergency demonstration |
+| Battery, temperature, communications and rover telemetry | Simulated fictional rover state | Mission constraints and interface feedback |
+
+The approved fictional rover energy model uses **100 Wh capacity**, a **10 Wh reserve**, and **0.25 Wh/m** driving energy. The emergency demonstration begins with 65 Wh and injects a simulated rectangular blockage at rows 62–72 and columns 115–135.
 
 ---
 
@@ -18,7 +48,8 @@ Mars Rover Guardian is an interactive dual-mode space mission and planetary expl
   - *Gale Crater* (Curiosity rover site & mission base)
   - *Jezero Crater* (Perseverance rover & Ingenuity site)
   - *North & South Polar Caps* (Planum Boreum & Planum Australe)
-- **Historic Landing Sites & Traverse Trajectory**: 3D markers for Curiosity, Perseverance, Opportunity, and the live Gale Rover Base, Science Target Candidate, and emergency obstacle zone.
+- **Historic Landing Sites & Traverse Trajectory**: 3D markers for Curiosity, Perseverance, Opportunity, the simulated Gale operations point, the science-target candidate, and the emergency obstacle zone.
+- **Scoped Bookmark Actions**: `VIEW` moves the camera without changing the mission. `SET TARGET` is available for verified local terrain; distant landmarks open in clearly labeled regional-visualization mode.
 
 ### Mode 2: First-Person Surface View ("Drop Me Here")
 - **Ground Dropping**: Click the **"DROP ME ANYWHERE ON MARS"** button and click any point on the Martian surface. The camera smoothly descends from orbit down to surface level (~1.7 m above terrain).
@@ -35,6 +66,12 @@ Mars Rover Guardian is an interactive dual-mode space mission and planetary expl
 ### Mode 3: 2D Tactical Traverse View
 - Focused high-resolution (1.012 m/cell) local routing interface in Gale Crater.
 - Live outbound traverse planning (cyan) and emergency detour calculation (bold red around simulated rectangular hazard zone rows 62–72, cols 115–135).
+
+### Mode 4: 3D Rover Replay
+- Animates the fictional AER-1 rover along the route returned by the Python service.
+- Drapes the HiRISE orthophoto over the measured local elevation mesh.
+- Supports nominal and emergency route playback with selectable camera views.
+- Uses visual time acceleration; the displayed rover state, wheel slip, blockage, and telemetry are simulated.
 
 ---
 
@@ -85,35 +122,37 @@ The first-person camera controller (`src/components/Mars3DScene.tsx`) operates v
 
 - **Global DEM Resolution**: The global Mars elevation layer operates at approximately 200 meters per pixel. When walking at 1.7 meters eye-level in first-person mode, micro-relief (small rocks, pebbles, sand dunes under 200 meters across) is smoothly interpolated between ground postings rather than presenting photogrammetric sub-meter roughness.
 - **Local HiRISE Overlay**: Local sub-meter terrain crops (such as the 1.012 m/cell Gale Crater crop used by the Python routing service) provide high-resolution feature recognition, while the global layer ensures planet-wide navigation.
+- **No planet-wide safety routing**: Global bookmarks are visual exploration aids. Route feasibility is calculated only for coordinates inside the verified local crop.
+- **Derived and simulated hazards**: Roughness is derived from elevation. Slip risk, blocked cells, rover telemetry, and emergency conditions are project simulations rather than measured obstacle-clearance evidence.
+- **Provisional science interpretation**: The target is associated with a supplied Sol 4621 waypoint, but exact boxwork geology and local CRISM coverage remain unverified.
 
 ---
 
 ## Quickstart Setup & Run
 
 ### Prerequisites
-- Node.js (v18+) & npm
+- Node.js 22 & npm
 - Python (v3.10+)
 
 ### 1. Start Python Routing Backend
 ```powershell
-cd mars-walk-guardian
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install fastapi uvicorn
-uvicorn backend.app.main:app --reload --port 8000
+python -m pip install -r backend\requirements.txt
+python -m uvicorn backend.app.main:app --reload --port 8000
 ```
 API health endpoint: `http://127.0.0.1:8000/health`
 
 ### 2. Start Frontend
 ```powershell
-cd mars-walk-guardian
-npm install
+npm ci
 npm run dev
 ```
 Open `http://localhost:5173`. Use the top navigation bar to toggle between:
 - **3D GLOBE** (Mode 1: Orbital exploration & bookmarks)
 - **1ST-PERSON** (Mode 2: Surface walking & telemetry HUD)
 - **2D TACTICAL** (Mode 3: Local Gale Crater mission grid)
+- **ROVER** (Mode 4: 3D route replay)
 
 ### 3. Verify
 ```powershell
@@ -123,9 +162,19 @@ python -m unittest discover -s backend/tests -v
 
 ## GitHub Pages
 
-The GitHub Pages workflow publishes the React interface from
-`feature/weighted-astar-routing` at `/mars-walk-guardian/`. GitHub Pages is
-static hosting and does not run the Python FastAPI backend. Set the repository
-Actions variable `VITE_ROUTING_API_URL` to a public HTTPS backend URL for live
-routing outside the local demo environment; otherwise the published interface
-will continue looking for the routing service at `http://localhost:8000`.
+Every push to `main` runs `.github/workflows/deploy-pages.yml`. The workflow builds the React interface with Node.js 22 and publishes it at `/mars-walk-guardian/`.
+
+GitHub Pages hosts the static frontend. The Python FastAPI backend is deployed separately on Render using `render.yaml`. During the Pages build, `VITE_ROUTING_API_URL` is set to `https://mars-walk-guardian-api.onrender.com`, enabling the public site to request live weighted A* routes.
+
+Render's free service may sleep while inactive, so the first routing request can take longer while the service wakes up.
+
+## Verified Demonstration Baseline
+
+For the committed base and target using the approved fictional rover assumptions:
+
+| Scenario | Distance | Energy | Normalized risk | Battery after traverse |
+| --- | ---: | ---: | ---: | ---: |
+| Nominal outbound route | 85.74 m | 21.43 Wh | 0.31 | 78.57 Wh |
+| Simulated emergency return | 90.48 m | 22.62 Wh | 0.32 | 42.38 Wh from a 65 Wh emergency state |
+
+Values are outputs of the current demonstration dataset and assumptions, not guarantees for a physical Mars rover.
